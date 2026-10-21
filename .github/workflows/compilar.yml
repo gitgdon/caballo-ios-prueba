@@ -18,10 +18,15 @@ jobs:
 
       - name: Compilar sin firmar
         run: |
+          set -o pipefail
           xcodebuild -project CaballoPrueba.xcodeproj -scheme CaballoPrueba \
             -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' \
             -derivedDataPath build \
-            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" build 2>&1 | tee build.log || {
+            # Los registros solo se ven con sesión iniciada; las anotaciones son públicas.
+            grep -E "error:|BUILD FAILED|xcodebuild: error" build.log | sort -u | head -20 | while IFS= read -r l; do echo "::error::$l"; done
+            exit 1
+          }
 
       - name: Meter permisos y empaquetar .ipa
         run: |
