@@ -15,6 +15,9 @@ targets:
     platform: iOS
     sources: [App, Shared]
     scheme: {}
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.caballoblanco.prueba
     info:
       path: App/Info.plist
       properties:
@@ -30,6 +33,9 @@ targets:
     type: app-extension
     platform: iOS
     sources: [Widget, Shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.caballoblanco.prueba.widget
     info:
       path: Widget/Info.plist
       properties:
