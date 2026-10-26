@@ -25,59 +25,68 @@ struct Proveedor: TimelineProvider {
 
 struct BotonHecho: View {
     let mision: Vista.Mision?
+    var lado: CGFloat = 36
 
     var body: some View {
         if let m = mision, m.tipo != "decision" {
             Button(intent: HechoIntent(misionId: m.id)) {
-                Image(systemName: "checkmark.circle.fill").font(.title2)
+                Image(systemName: "checkmark")
+                    .font(.system(size: lado * 0.45, weight: .bold))
+                    .foregroundStyle(Tema.sobreAcento)
+                    .frame(width: lado, height: lado)
+                    .background(Circle().fill(Tema.acento))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel("Hecho")
         }
     }
 }
 
-private let fondoInicio = LinearGradient(
-    colors: [Color(red: 0.23, green: 0.16, blue: 0.11), Color(red: 0.85, green: 0.55, blue: 0.25)],
-    startPoint: .topLeading, endPoint: .bottomTrailing
-)
-
 private func textoSinMision(_ v: Vista) -> String {
     v.hayProductos ? "Día cerrado. Descansa, jinete." : "Toca para empezar tu primer producto"
+}
+
+private func lineaRacha(_ v: Vista) -> String {
+    "Nv \(v.nivel)" + (v.racha > 0 ? " · 🔥\(v.racha)" : "")
+}
+
+private struct BarraXP: View {
+    let v: Vista
+
+    var body: some View {
+        let fraccion = min(max(Double(v.xp) / Double(max(v.xpSig, 1)), 0), 1)
+        ZStack(alignment: .leading) {
+            Capsule().fill(Tema.borde)
+            Capsule().fill(Tema.Anillo.xp).frame(width: 70 * fraccion)
+        }
+        .frame(width: 70, height: 5)
+        .accessibilityHidden(true)
+    }
 }
 
 struct Mediano: View {
     let v: Vista
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 5) {
+        VStack(alignment: .leading, spacing: 8) {
             if let texto = v.porque.map({ "💭 " + $0 }) ?? v.frase?.texto {
-                Text(texto).font(.system(size: 13).italic()).lineLimit(2).minimumScaleFactor(0.8)
-            }
-            HStack(spacing: 8) {
-                Caballo(humor: v.humor, lado: 34)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(v.lineaNivel).font(.system(size: 13, weight: .bold)).lineLimit(1).minimumScaleFactor(0.6)
-                    ProgressView(value: Double(v.xp), total: Double(max(v.xpSig, 1))).tint(.white)
-                }
+                Text(texto).font(.callout.italic().weight(.semibold)).lineLimit(2).minimumScaleFactor(0.8)
+                    .foregroundStyle(Tema.texto)
             }
             Spacer(minLength: 0)
-            HStack(alignment: .bottom) {
-                VStack(alignment: .leading, spacing: 1) {
-                    if let m = v.mision {
-                        Text("MISIÓN DE LA \(m.bloque.uppercased())").font(.system(size: 9, weight: .bold)).opacity(0.75)
-                        Text(m.texto).font(.system(size: 12, weight: .semibold)).lineLimit(2)
-                    } else {
-                        Text(textoSinMision(v)).font(.system(size: 12, weight: .semibold))
-                    }
-                    if let linea = v.lineaProducto {
-                        Text(linea).font(.system(size: 10)).opacity(0.75).lineLimit(1).minimumScaleFactor(0.7)
-                    }
+            HStack(spacing: 8) {
+                Caballo(humor: v.humor, lado: 36)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lineaRacha(v)).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                        .foregroundStyle(Tema.texto)
+                    BarraXP(v: v)
                 }
+                Text(v.mision?.texto ?? textoSinMision(v)).font(.caption.weight(.semibold)).lineLimit(2)
+                    .foregroundStyle(Tema.texto)
                 Spacer(minLength: 4)
                 BotonHecho(mision: v.mision)
             }
         }
-        .foregroundStyle(.white)
     }
 }
 
@@ -86,15 +95,22 @@ struct Pequeno: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Caballo(humor: v.humor, lado: 30)
-                Text("Nv \(v.nivel)" + (v.racha > 0 ? " · 🔥\(v.racha)" : "")).font(.system(size: 13, weight: .bold))
+            HStack(spacing: 8) {
+                Caballo(humor: v.humor, lado: 36)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lineaRacha(v)).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                        .foregroundStyle(Tema.texto)
+                    BarraXP(v: v)
+                }
             }
             Spacer(minLength: 0)
-            Text(v.mision?.texto ?? textoSinMision(v)).font(.system(size: 12, weight: .semibold)).lineLimit(3)
-            HStack { Spacer(); BotonHecho(mision: v.mision) }
+            HStack(alignment: .bottom, spacing: 4) {
+                Text(v.mision?.texto ?? textoSinMision(v)).font(.caption.weight(.semibold)).lineLimit(3)
+                    .foregroundStyle(Tema.texto)
+                Spacer(minLength: 0)
+                BotonHecho(mision: v.mision)
+            }
         }
-        .foregroundStyle(.white)
     }
 }
 
@@ -104,11 +120,21 @@ struct Rectangular: View {
     var body: some View {
         HStack(spacing: 6) {
             VStack(alignment: .leading, spacing: 1) {
-                Text("🐴 Nv \(v.nivel)" + (v.racha > 0 ? " · 🔥\(v.racha)" : "")).font(.headline).lineLimit(1)
+                HStack(spacing: 4) {
+                    Image("caballo").renderingMode(.template).resizable().scaledToFit().frame(width: 16, height: 16)
+                        .accessibilityHidden(true)
+                    Text(lineaRacha(v)).font(.headline).lineLimit(1)
+                }
                 Text(v.mision?.texto ?? textoSinMision(v)).font(.caption).lineLimit(2)
             }
             Spacer(minLength: 0)
-            BotonHecho(mision: v.mision)
+            if let m = v.mision, m.tipo != "decision" {
+                Button(intent: HechoIntent(misionId: m.id)) {
+                    Image(systemName: "checkmark.circle").font(.title2)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Hecho")
+            }
         }
     }
 }
@@ -116,11 +142,19 @@ struct Rectangular: View {
 struct Circular: View {
     let v: Vista
 
+    private static let medallas = [7, 30, 100, 365]
+
     var body: some View {
-        VStack(spacing: 0) {
-            Text(v.racha > 0 ? "🔥" : "🐴").font(.system(size: 14))
-            Text("\(v.racha > 0 ? v.racha : v.nivel)").font(.system(size: 18, weight: .bold))
+        let tope = Self.medallas.first { $0 > v.racha } ?? max(v.racha, 1)
+        Gauge(value: Double(min(v.racha, tope)), in: 0...Double(tope)) {
+            Text("Racha")
+        } currentValueLabel: {
+            VStack(spacing: 0) {
+                Text("🔥").font(.system(size: 12))
+                Text("\(v.racha)").font(.system(size: 16, weight: .bold, design: .rounded))
+            }
         }
+        .gaugeStyle(.accessoryCircular)
     }
 }
 
@@ -137,12 +171,16 @@ struct VistaWidget: View {
             switch familia {
             case .accessoryCircular: Circular(v: v)
             case .accessoryRectangular: Rectangular(v: v)
-            case .accessoryInline: Text("🐴 Nv \(v.nivel) · " + (v.mision?.texto ?? "Día cerrado"))
+            case .accessoryInline:
+                Text("Nv \(v.nivel) · 🔥\(v.racha) · 🛡️\(v.escudos)")
             case .systemSmall: Pequeno(v: v)
             default: Mediano(v: v)
             }
         } else {
-            Text("🐴 Abre Caballo Blanco").font(.caption)
+            HStack(spacing: 8) {
+                Caballo(humor: "normal", lado: 36)
+                Text("Abre Caballo Blanco").font(.caption).foregroundStyle(Tema.textoSuave)
+            }
         }
     }
 
@@ -150,7 +188,12 @@ struct VistaWidget: View {
         switch familia {
         case .accessoryCircular: AccessoryWidgetBackground()
         case .accessoryRectangular, .accessoryInline: Color.clear
-        default: fondoInicio
+        default:
+            ZStack(alignment: .topTrailing) {
+                Tema.superficie
+                Circle().fill(Tema.degradadoMarca).frame(width: 120, height: 120)
+                    .blur(radius: 30).opacity(0.35).offset(x: 40, y: -40)
+            }
         }
     }
 }

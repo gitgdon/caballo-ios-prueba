@@ -1,19 +1,22 @@
 import ActivityKit
 import SwiftUI
-import UIKit
 import WidgetKit
 
-/// Caballo pequeño para la tarjeta (imágenes reducidas: las grandes pueden no pintarse aquí).
+private let doradoTarjeta = Color(red: 0.89, green: 0.659, blue: 0.29)
+private let oscuroTarjeta = Color(red: 0.122, green: 0.102, blue: 0.078)
+
+/// Caballo vectorial en plantilla (una sola tinta).
 private struct CaballoMini: View {
-    let humor: String
     let lado: CGFloat
 
     var body: some View {
-        if let imagen = UIImage(named: "caballo-\(humor)-p") {
-            Image(uiImage: imagen).resizable().scaledToFit().frame(width: lado, height: lado)
-        } else {
-            Text("🐴").font(.system(size: lado * 0.8))
-        }
+        Image("caballo")
+            .renderingMode(.template)
+            .resizable()
+            .scaledToFit()
+            .frame(width: lado, height: lado)
+            .foregroundStyle(doradoTarjeta)
+            .accessibilityHidden(true)
     }
 }
 
@@ -23,10 +26,14 @@ private struct BotonHechoGrande: View {
     var body: some View {
         if let id = misionId {
             Button(intent: HechoIntent(misionId: id)) {
-                Image(systemName: "checkmark.circle.fill").font(.system(size: 38))
+                Image(systemName: "checkmark")
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(oscuroTarjeta)
+                    .frame(width: 44, height: 44)
+                    .background(Circle().fill(doradoTarjeta))
             }
             .buttonStyle(.plain)
-            .tint(.green)
+            .accessibilityLabel("Hecho")
         }
     }
 }
@@ -37,7 +44,7 @@ private struct TarjetaBloqueo: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .top, spacing: 10) {
-                CaballoMini(humor: e.humor, lado: 46)
+                CaballoMini(lado: 44)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(e.nivel).font(.system(size: 14, weight: .bold)).lineLimit(1).minimumScaleFactor(0.7)
                     if !e.frase.isEmpty {
@@ -69,12 +76,12 @@ struct CaballoActividad: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CaballoAtributos.self) { contexto in
             TarjetaBloqueo(e: contexto.state)
-                .activityBackgroundTint(Color(red: 0.30, green: 0.20, blue: 0.13))
+                .activityBackgroundTint(Color(red: 0.08, green: 0.067, blue: 0.05).opacity(0.85))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { contexto in
             let e = contexto.state
             return DynamicIsland {
-                DynamicIslandExpandedRegion(.leading) { CaballoMini(humor: e.humor, lado: 36) }
+                DynamicIslandExpandedRegion(.leading) { CaballoMini(lado: 36) }
                 DynamicIslandExpandedRegion(.trailing) {
                     Text(e.racha > 0 ? "🔥\(e.racha)" : "").font(.headline)
                 }
