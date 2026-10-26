@@ -25,6 +25,10 @@ struct ContentView: View {
                 WidgetCenter.shared.reloadAllTimelines()
             }
             .buttonStyle(.borderedProminent)
+            Text("Grupo: \(Contador.grupo)")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .padding(.top, 30)
         }
         .onChange(of: fase) { _, nueva in
             if nueva == .active { valor = Contador.valor }
