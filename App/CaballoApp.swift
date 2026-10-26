@@ -67,6 +67,7 @@ struct Inicio: View {
     @State private var plataformaPara: String?
     @State private var editandoPorque = false
     @State private var textoPorque = ""
+    @State private var tarjetaActiva = Actividad.activada
 
     var body: some View {
         ZStack {
@@ -84,6 +85,7 @@ struct Inicio: View {
                             misiones(v)
                             acciones(v)
                         }
+                        ajustes
                     }
                     .padding()
                 }
@@ -204,6 +206,22 @@ struct Inicio: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    private var ajustes: some View {
+        Tarjeta {
+            Toggle("Tarjeta en la pantalla de bloqueo", isOn: Binding(
+                get: { tarjetaActiva },
+                set: { nuevo in
+                    tarjetaActiva = nuevo
+                    Actividad.activada = nuevo
+                    modelo.refrescar()
+                }
+            ))
+            .tint(.green)
+            Text("Incluye el 🐴 de la isla dinámica: iOS no deja mostrar una sin la otra.")
+                .font(.caption).opacity(0.75)
+        }
     }
 
     private func mensajeSaltar(_ v: Vista) -> String {

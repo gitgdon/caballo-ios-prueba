@@ -39,9 +39,20 @@ enum Actividad {
         return f.string(from: .now)
     }
 
+    /// El interruptor de la app (por defecto encendida). Apagarla quita también la isla dinámica.
+    static var activada: Bool {
+        get { UserDefaults(suiteName: Juego.grupo)?.object(forKey: "actividadActivada") as? Bool ?? true }
+        set { UserDefaults(suiteName: Juego.grupo)?.set(newValue, forKey: "actividadActivada") }
+    }
+
+    static func apagar() async {
+        for a in Activity<CaballoAtributos>.activities { await a.end(nil, dismissalPolicy: .immediate) }
+    }
+
     /// Actualiza la tarjeta si existe y es de hoy; si no, la (re)enciende.
     /// Encenderla solo funciona con la app abierta o desde un botón de la propia tarjeta/widget.
     static func actualizar(_ v: Vista?) async {
+        guard activada else { await apagar(); return }
         guard let v, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
         let nuevo = ActivityContent(state: contenido(v), staleDate: nil)
         let actuales = Activity<CaballoAtributos>.activities

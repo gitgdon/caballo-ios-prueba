@@ -89,11 +89,11 @@ struct CaballoActividad: Widget {
                     }
                 }
             } compactLeading: {
-                Text("🐴")
+                EmptyView()
             } compactTrailing: {
-                Text(e.racha > 0 ? "🔥\(e.racha)" : "✅")
+                Text("🐴").font(.caption2)
             } minimal: {
-                Text("🐴")
+                Text("🐴").font(.caption2)
             }
         }
     }
