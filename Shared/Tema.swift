@@ -34,6 +34,14 @@ enum Tema {
         static let frase = dinamico(0x9C6514, 0xD59A3C)
     }
 
+    /// Colores fijos (tokens oscuros) para la tarjeta de la pantalla de bloqueo, que siempre es oscura.
+    enum Bloqueo {
+        static let dorado = Color(hex(0xE3A84A))
+        static let sobreDorado = Color(hex(0x1F1A14))
+        static let texto = Color(hex(0xF6F1EA))
+        static let tinte = Color(hex(0x14110D)).opacity(0.85)
+    }
+
     static let degradadoMarca = LinearGradient(
         colors: [
             Color(hex(0xFFF4E2)),

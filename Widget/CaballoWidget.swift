@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 import WidgetKit
 
 struct Entrada: TimelineEntry {
@@ -50,6 +49,10 @@ private func lineaRacha(_ v: Vista) -> String {
     "Nv \(v.nivel)" + (v.racha > 0 ? " · 🔥\(v.racha)" : "")
 }
 
+private func etiquetaRacha(_ v: Vista) -> String {
+    "Nivel \(v.nivel)" + (v.racha > 0 ? ", racha \(v.racha) días" : "")
+}
+
 private struct BarraXP: View {
     let v: Vista
 
@@ -60,7 +63,9 @@ private struct BarraXP: View {
             Capsule().fill(Tema.Anillo.xp).frame(width: 70 * fraccion)
         }
         .frame(width: 70, height: 5)
-        .accessibilityHidden(true)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Experiencia")
+        .accessibilityValue("\(v.xp) de \(v.xpSig)")
     }
 }
 
@@ -78,6 +83,7 @@ struct Mediano: View {
                 Caballo(humor: v.humor, lado: 36)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(lineaRacha(v)).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                        .accessibilityLabel(etiquetaRacha(v))
                         .foregroundStyle(Tema.texto)
                     BarraXP(v: v)
                 }
@@ -99,6 +105,7 @@ struct Pequeno: View {
                 Caballo(humor: v.humor, lado: 36)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(lineaRacha(v)).font(.caption.bold()).lineLimit(1).minimumScaleFactor(0.7)
+                        .accessibilityLabel(etiquetaRacha(v))
                         .foregroundStyle(Tema.texto)
                     BarraXP(v: v)
                 }
@@ -123,7 +130,7 @@ struct Rectangular: View {
                 HStack(spacing: 4) {
                     Image("caballo").renderingMode(.template).resizable().scaledToFit().frame(width: 16, height: 16)
                         .accessibilityHidden(true)
-                    Text(lineaRacha(v)).font(.headline).lineLimit(1)
+                    Text(lineaRacha(v)).font(.headline).lineLimit(1).accessibilityLabel(etiquetaRacha(v))
                 }
                 Text(v.mision?.texto ?? textoSinMision(v)).font(.caption).lineLimit(2)
             }
@@ -155,6 +162,8 @@ struct Circular: View {
             }
         }
         .gaugeStyle(.accessoryCircular)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Racha: \(v.racha) días")
     }
 }
 

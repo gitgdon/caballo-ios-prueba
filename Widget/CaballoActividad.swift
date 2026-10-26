@@ -2,9 +2,6 @@ import ActivityKit
 import SwiftUI
 import WidgetKit
 
-private let doradoTarjeta = Color(red: 0.89, green: 0.659, blue: 0.29)
-private let oscuroTarjeta = Color(red: 0.122, green: 0.102, blue: 0.078)
-
 /// Caballo vectorial en plantilla (una sola tinta).
 private struct CaballoMini: View {
     let lado: CGFloat
@@ -15,7 +12,7 @@ private struct CaballoMini: View {
             .resizable()
             .scaledToFit()
             .frame(width: lado, height: lado)
-            .foregroundStyle(doradoTarjeta)
+            .foregroundStyle(Tema.Bloqueo.dorado)
             .accessibilityHidden(true)
     }
 }
@@ -28,9 +25,9 @@ private struct BotonHechoGrande: View {
             Button(intent: HechoIntent(misionId: id)) {
                 Image(systemName: "checkmark")
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(oscuroTarjeta)
+                    .foregroundStyle(Tema.Bloqueo.sobreDorado)
                     .frame(width: 44, height: 44)
-                    .background(Circle().fill(doradoTarjeta))
+                    .background(Circle().fill(Tema.Bloqueo.dorado))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Hecho")
@@ -52,7 +49,7 @@ private struct TarjetaBloqueo: View {
                     }
                 }
             }
-            Divider().overlay(.white.opacity(0.4))
+            Divider().overlay(Tema.Bloqueo.texto.opacity(0.4))
             HStack(alignment: .center, spacing: 8) {
                 VStack(alignment: .leading, spacing: 2) {
                     if !e.bloque.isEmpty {
@@ -68,7 +65,7 @@ private struct TarjetaBloqueo: View {
             }
         }
         .padding(14)
-        .foregroundStyle(.white)
+        .foregroundStyle(Tema.Bloqueo.texto)
     }
 }
 
@@ -76,8 +73,8 @@ struct CaballoActividad: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: CaballoAtributos.self) { contexto in
             TarjetaBloqueo(e: contexto.state)
-                .activityBackgroundTint(Color(red: 0.08, green: 0.067, blue: 0.05).opacity(0.85))
-                .activitySystemActionForegroundColor(.white)
+                .activityBackgroundTint(Tema.Bloqueo.tinte)
+                .activitySystemActionForegroundColor(Tema.Bloqueo.texto)
         } dynamicIsland: { contexto in
             let e = contexto.state
             return DynamicIsland {
