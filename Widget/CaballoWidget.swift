@@ -20,8 +20,39 @@ struct Proveedor: TimelineProvider {
 
 struct VistaWidget: View {
     let entrada: Entrada
+    @Environment(\.widgetFamily) private var familia
 
     var body: some View {
+        switch familia {
+        case .accessoryCircular: circular
+        case .accessoryRectangular: rectangular
+        case .accessoryInline: Text("🐴 \(entrada.valor)")
+        default: inicio
+        }
+    }
+
+    // Pantalla de bloqueo: iOS los tiñe de un solo color, sin fondo propio.
+    private var circular: some View {
+        Button(intent: SumarIntent()) {
+            VStack(spacing: 0) {
+                Text("🐴").font(.system(size: 14))
+                Text("\(entrada.valor)").font(.system(size: 18, weight: .bold))
+            }
+        }
+        .buttonStyle(.plain)
+        .containerBackground(for: .widget) { AccessoryWidgetBackground() }
+    }
+
+    private var rectangular: some View {
+        HStack {
+            Text("🐴 \(entrada.valor)").font(.headline)
+            Spacer()
+            Button(intent: SumarIntent()) { Text("✅ +1") }
+        }
+        .containerBackground(for: .widget) { Color.clear }
+    }
+
+    private var inicio: some View {
         VStack(spacing: 10) {
             Text("🐴 \(entrada.valor)")
                 .font(.system(size: 34, weight: .bold))
@@ -47,6 +78,6 @@ struct CaballoWidget: Widget {
         }
         .configurationDisplayName("Caballo prueba")
         .description("Botón +1 sin abrir la app")
-        .supportedFamilies([.systemSmall, .systemMedium])
+        .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
     }
 }
