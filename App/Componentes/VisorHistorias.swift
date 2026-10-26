@@ -63,7 +63,7 @@ struct VisorHistorias: View {
                 .font(.headline)
                 .foregroundStyle(Tema.texto)
             Text(pagina.grande)
-                .font(.system(size: 28, weight: .bold))
+                .font(.largeTitle.bold())
                 .foregroundStyle(Tema.texto)
                 .multilineTextAlignment(.center)
             if let pie = pagina.pie {

@@ -16,7 +16,7 @@ struct Mas: View {
                 .background(Tema.fondo)
                 .navigationTitle("Más")
         }
-        .onAppear { textoPorque = modelo.vista?.porqueGuardado ?? "" }
+        .onAppear { if textoPorque.isEmpty { textoPorque = modelo.vista?.porqueGuardado ?? "" } }
     }
 
     private var lista: some View {

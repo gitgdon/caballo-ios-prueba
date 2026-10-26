@@ -14,7 +14,7 @@ struct MisionPrincipal: View {
                     .font(.caption.bold())
                     .foregroundStyle(Tema.textoSuave)
                 Text(mision.texto)
-                    .font(.system(size: 22, weight: .bold))
+                    .font(.title2.bold())
                     .foregroundStyle(Tema.texto)
                     .lineLimit(3)
                     .minimumScaleFactor(0.8)
@@ -33,6 +33,11 @@ struct MisionPrincipal: View {
                 Text(textoVacio)
                     .font(.body)
                     .foregroundStyle(Tema.texto)
+                if let lineaProducto {
+                    Text(lineaProducto)
+                        .font(.footnote)
+                        .foregroundStyle(Tema.textoSuave)
+                }
             }
         }
     }

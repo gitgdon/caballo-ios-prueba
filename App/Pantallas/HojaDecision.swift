@@ -25,7 +25,7 @@ struct HojaDecision: View {
 
     private func pregunta(_ texto: String) -> some View {
         Text(texto)
-            .font(.system(size: 22, weight: .bold))
+            .font(.title2.bold())
             .foregroundStyle(Tema.texto)
             .padding(.bottom, Espacio.s)
     }

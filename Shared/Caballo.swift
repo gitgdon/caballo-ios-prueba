@@ -26,6 +26,6 @@ struct Caballo: View {
         }
         .frame(width: lado, height: lado)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Tu caballo: \(humor)")
+        .accessibilityLabel("Tu caballo: \(humor == "barro" ? "con barro" : humor)")
     }
 }

@@ -37,10 +37,15 @@ struct Productos: View {
             set: { if !$0 { productoPara = nil } }
         ), titleVisibility: .visible) {
             Button("🟢 Un vídeo ha funcionado") { ejecutar("ganador") }
+                .accessibilityLabel("Un vídeo ha funcionado")
             Button("🔥 10k en TikTok") { ejecutar("viral", "tiktok") }
+                .accessibilityLabel("10k en TikTok")
             Button("🔥 10k en Instagram") { ejecutar("viral", "instagram") }
+                .accessibilityLabel("10k en Instagram")
             Button("🔥 10k en YouTube Shorts") { ejecutar("viral", "youtube") }
+                .accessibilityLabel("10k en YouTube Shorts")
             Button("💰 He vendido") { ejecutar("vendido") }
+                .accessibilityLabel("He vendido")
         }
     }
 

@@ -94,7 +94,7 @@ private struct FilaHistorias: View {
     let vista: Vista
     /// El aviso se repite encima del visor para que no caduque tapado.
     @Binding var aviso: String?
-    @AppStorage("medallaVista") private var medallaVista = 0
+    @AppStorage("medallaVista") private var medallaVista = -1
     @AppStorage("historiasVistas") private var historiasVistas = ""
     @State private var visor: VisorAbierto?
 
@@ -130,7 +130,7 @@ private struct FilaHistorias: View {
     }
 
     private var medallaNueva: Int? {
-        guard let m = vista.medallas.max(), m > medallaVista else { return nil }
+        guard let m = vista.medallas.max(), medallaVista >= 0, m > medallaVista else { return nil }
         return m
     }
 
@@ -154,6 +154,10 @@ private struct FilaHistorias: View {
             }
             .padding(.horizontal, Espacio.l)
             .padding(.vertical, Espacio.xs)
+        }
+        .onAppear {
+            // Primer arranque: la medalla que ya había no cuenta como nueva.
+            if medallaVista < 0 { medallaVista = vista.medallas.max() ?? 0 }
         }
         .fullScreenCover(item: $visor) { abierto in
             VisorHistorias(paginas: abierto.paginas, inicio: abierto.inicio)

@@ -8,7 +8,7 @@ struct HojaSaltar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Espacio.m) {
             Text("¿Seguro?")
-                .font(.system(size: 22, weight: .bold))
+                .font(.title2.bold())
                 .foregroundStyle(Tema.texto)
             if let v = modelo.vista {
                 ScrollView {

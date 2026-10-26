@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Píldora de logro que baja desde arriba.
 struct AvisoLogro: View {
@@ -32,6 +33,9 @@ private struct ModificadorAvisoLogro: ViewModifier {
                         .accessibilityAddTraits(.isButton)
                         .accessibilityHint("Toca para cerrar")
                         .task(id: valor) {
+                            AccessibilityNotification.Announcement(valor).post()
+                            // Con VoiceOver no caduca solo: se cierra tocándolo.
+                            if UIAccessibility.isVoiceOverRunning { return }
                             // Más tiempo cuanto más largo (el del bajón ronda los 9 s).
                             let segundos = max(3, Double(valor.count) / 15)
                             try? await Task.sleep(nanoseconds: UInt64(segundos * 1_000_000_000))

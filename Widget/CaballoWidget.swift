@@ -181,10 +181,12 @@ struct VistaWidget: View {
             case .accessoryCircular: Circular(v: v)
             case .accessoryRectangular: Rectangular(v: v)
             case .accessoryInline:
-                Text("Nv \(v.nivel) · 🔥\(v.racha) · 🛡️\(v.escudos)")
+                Text(["Nv \(v.nivel)", v.racha > 0 ? "🔥\(v.racha)" : nil, v.escudos > 0 ? "🛡️\(v.escudos)" : nil].compactMap { $0 }.joined(separator: " · "))
             case .systemSmall: Pequeno(v: v)
             default: Mediano(v: v)
             }
+        } else if [.accessoryCircular, .accessoryRectangular, .accessoryInline].contains(familia) {
+            Text("Abre Caballo Blanco")
         } else {
             HStack(spacing: 8) {
                 Caballo(humor: "normal", lado: 36)
