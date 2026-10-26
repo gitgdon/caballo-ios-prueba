@@ -1,0 +1,45 @@
+  AAA   16.30:1  light-text               on light-bg             
+  AAA   17.27:1  light-text               on light-surface        
+  AAA   14.97:1  light-text               on light-surface-2      
+  AA     6.07:1  light-text-muted         on light-bg             
+  AA     6.43:1  light-text-muted         on light-surface        
+  AA     5.58:1  light-text-muted         on light-surface-2      
+  AA     5.33:1  light-on-accent          on light-accent         
+  AA     5.03:1  light-accent             on light-bg             
+  AA     5.33:1  light-accent             on light-surface        
+  AA     6.01:1  light-success            on light-surface        
+  AA     6.54:1  light-danger             on light-surface        
+  AA     6.17:1  light-warning            on light-surface        
+  PASS   3.92:1  light-border-input       on light-surface        ui
+  AAA   16.75:1  dark-text                on dark-bg              
+  AAA   15.04:1  dark-text                on dark-surface         
+  AAA   13.62:1  dark-text                on dark-surface-2       
+  AAA    8.44:1  dark-text-muted          on dark-bg              
+  AAA    7.58:1  dark-text-muted          on dark-surface         
+  AA     6.87:1  dark-text-muted          on dark-surface-2       
+  AAA    8.20:1  dark-on-accent           on dark-accent          
+  AAA    8.93:1  dark-accent              on dark-bg              
+  AAA    8.02:1  dark-accent              on dark-surface         
+  AAA    7.82:1  dark-success             on dark-surface         
+  AA     6.65:1  dark-danger              on dark-surface         
+  AAA    8.93:1  dark-warning             on dark-surface         
+  PASS   4.43:1  dark-border-input        on dark-surface         ui
+  AAA   15.86:1  light-text               on brand-crema          
+  PASS   4.24:1  ring-light-xp            on light-surface        ui
+  PASS   4.00:1  ring-light-xp            on light-bg             ui
+  PASS   8.02:1  ring-dark-xp             on dark-surface         ui
+  PASS   8.93:1  ring-dark-xp             on dark-bg              ui
+  PASS   4.38:1  ring-light-racha         on light-surface        ui
+  PASS   4.13:1  ring-light-racha         on light-bg             ui
+  PASS   5.18:1  ring-dark-racha          on dark-surface         ui
+  PASS   5.77:1  ring-dark-racha          on dark-bg              ui
+  PASS   4.77:1  ring-light-producto      on light-surface        ui
+  PASS   4.50:1  ring-light-producto      on light-bg             ui
+  PASS   5.60:1  ring-dark-producto       on dark-surface         ui
+  PASS   6.24:1  ring-dark-producto       on dark-bg              ui
+  PASS   4.90:1  ring-light-frase         on light-surface        ui
+  PASS   4.63:1  ring-light-frase         on light-bg             ui
+  PASS   6.86:1  ring-dark-frase          on dark-surface         ui
+  PASS   7.63:1  ring-dark-frase          on dark-bg              ui
+
+  43 pairs, 0 failing AA

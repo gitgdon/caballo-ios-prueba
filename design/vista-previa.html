@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Caballo Blanco · Diseño</title>
+<style>
+  :root{
+    --bg:#FBF8F3;--surface:#FFFFFF;--surface2:#F4EEE5;--border:#ECE5DA;--input:#8A7F70;
+    --text:#1F1A14;--muted:#675D52;--accent:#94600F;--onaccent:#FFFFFF;--success:#24704A;--warning:#8F5300;--danger:#B3261E;
+    --rxp:#A86F15;--rracha:#CF4F22;--rprod:#357F6C;--rfrase:#9C6514;
+    --crema:#FFF4E2;--dorado:#E3A84A;--marron:#6B4423;
+    --card:0 1px 2px rgba(31,26,20,.05),0 4px 16px rgba(31,26,20,.06);
+  }
+  .dark{
+    --bg:#14110D;--surface:#211C16;--surface2:#2B241C;--border:#3A3229;--input:#8C8173;
+    --text:#F6F1EA;--muted:#B8AC9C;--accent:#E3A84A;--onaccent:#1F1A14;--success:#5CC48A;--warning:#F2B04F;--danger:#FF7A6E;
+    --rxp:#E3A84A;--rracha:#E8673A;--rprod:#4FA38E;--rfrase:#D59A3C;
+    --card:0 0 0 1px #3A3229;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#E9E4DC;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;color:#1F1A14}
+  h1{font-size:22px;margin:24px 24px 4px} p.sub{margin:0 24px 16px;color:#675D52;font-size:14px}
+  .fila{display:flex;flex-wrap:wrap;gap:28px;padding:0 24px 32px;align-items:flex-start}
+  .tel{width:300px;border-radius:44px;padding:10px;background:#0b0b0c;box-shadow:0 20px 50px rgba(0,0,0,.25)}
+  .pant{border-radius:36px;overflow:hidden;background:var(--bg);color:var(--text);height:620px;position:relative}
+  .barra{display:flex;justify-content:space-between;padding:12px 26px 4px;font-size:13px;font-weight:600}
+  .tit{display:flex;justify-content:space-between;align-items:center;padding:6px 18px 2px}
+  .tit b{font-size:26px;letter-spacing:-.4px}
+  .ic{width:30px;height:30px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;color:var(--muted);font-size:15px}
+  .historias{display:flex;gap:12px;padding:10px 16px 6px;overflow:hidden}
+  .hist{display:flex;flex-direction:column;align-items:center;gap:5px;width:60px;flex:none}
+  .anillo{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;position:relative}
+  .anillo .in{width:50px;height:50px;border-radius:50%;background:var(--surface2);display:grid;place-items:center;font-weight:700;font-size:15px}
+  .hist span{font-size:11px;color:var(--muted)}
+  .horse{color:var(--text)} .horse svg{display:block}
+  .tarjeta{background:var(--surface);border-radius:22px;box-shadow:var(--card);margin:10px 14px;padding:16px}
+  .eti{font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--muted)}
+  .mision{font-size:20px;font-weight:700;line-height:1.25;margin:6px 0 4px;letter-spacing:-.2px}
+  .prod{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+  .btn{display:block;width:100%;border:0;border-radius:14px;height:48px;font-size:16px;font-weight:600;background:var(--accent);color:var(--onaccent)}
+  .lista .item{display:flex;align-items:center;gap:12px;padding:11px 0;border-top:1px solid var(--border);font-size:15px}
+  .lista .item:first-child{border-top:0}
+  .check{width:24px;height:24px;border-radius:50%;border:2px solid var(--input);flex:none;margin-left:auto}
+  .mini{font-size:10.5px;font-weight:700;color:var(--muted);letter-spacing:.5px}
+  .ghost{text-align:center;color:var(--accent);font-weight:600;font-size:15px;padding:8px}
+  .tab{position:absolute;left:0;right:0;bottom:0;display:flex;justify-content:space-around;padding:10px 0 22px;background:var(--surface);border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+  .tab div{display:flex;flex-direction:column;align-items:center;gap:3px} .tab .on{color:var(--accent)}
+  /* visor de historia */
+  .visor{height:620px;border-radius:36px;overflow:hidden;position:relative;color:#1F1A14;
+    background:linear-gradient(170deg,var(--crema) 0%,#F6D9A6 45%,var(--dorado) 75%,#B0742F 100%)}
+  .progreso{display:flex;gap:4px;padding:14px 14px 0}
+  .progreso i{flex:1;height:3px;border-radius:3px;background:rgba(31,26,20,.18)} .progreso i.on{background:rgba(31,26,20,.85)}
+  .frase{position:absolute;inset:120px 26px auto;font-size:28px;font-weight:700;line-height:1.22;letter-spacing:-.4px}
+  .autor{position:absolute;left:26px;bottom:70px;font-size:14px;font-weight:600;opacity:.75}
+  /* widgets */
+  .home{width:330px;border-radius:36px;padding:18px;background:linear-gradient(160deg,#cfc6b8,#8f8577)}
+  .w{border-radius:22px;background:var(--surface);color:var(--text);box-shadow:0 6px 18px rgba(0,0,0,.18);padding:14px}
+  .w-med{height:155px;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden}
+  .w-med:after{content:"";position:absolute;right:-40px;top:-40px;width:120px;height:120px;border-radius:50%;background:radial-gradient(circle,rgba(227,168,74,.35),transparent 70%)}
+  .w-fr{font-size:14px;font-style:italic;font-weight:600;line-height:1.25}
+  .w-ab{display:flex;align-items:flex-end;gap:10px}
+  .w-ok{width:36px;height:36px;border-radius:50%;background:var(--accent);color:var(--onaccent);display:grid;place-items:center;font-weight:800;margin-left:auto;flex:none}
+  .bar{height:5px;border-radius:5px;background:var(--surface2);overflow:hidden;width:70px;margin-top:4px}.bar i{display:block;height:100%;width:62%;background:var(--rxp)}
+  /* bloqueo */
+  .lock{width:330px;border-radius:36px;padding:18px 16px;background:linear-gradient(180deg,#1d2a35,#0f1418);color:#fff;text-align:center}
+  .hora{font-size:72px;font-weight:600;letter-spacing:-2px;line-height:1;margin:6px 0 10px}
+  .lw{display:flex;gap:10px;justify-content:center;margin-bottom:14px}
+  .lrect{background:rgba(255,255,255,.14);border-radius:16px;padding:8px 10px;text-align:left;width:170px;font-size:12px;display:flex;gap:8px;align-items:center}
+  .lcirc{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.14);display:grid;place-items:center;font-weight:700;position:relative}
+  .act{background:rgba(24,20,16,.78);backdrop-filter:blur(20px);border-radius:24px;padding:14px;text-align:left;margin-top:150px}
+  .act .fr{font-size:13.5px;font-style:italic;opacity:.92;margin:4px 0 10px}
+  .act .ok{width:44px;height:44px;border-radius:50%;background:#E3A84A;color:#1F1A14;display:grid;place-items:center;font-weight:800;flex:none}
+  .nota{font-size:12px;color:#675D52;max-width:300px;margin-top:10px}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <!-- Icono "horse" de Phosphor Icons (MIT) -->
+  <symbol id="horse" viewBox="0 0 256 256"><path fill="currentColor" d="M202.05,55A103.24,103.24,0,0,0,128,24h-8a8,8,0,0,0-8,8V59.53L11.81,121.19a8,8,0,0,0-2.59,11.05l13.78,22,.3.43a31.84,31.84,0,0,0,31.34,12.83c13.930-2.36,38.62-6.54,61.4,3.29l-26.6,36.57A84.710,84.710,0,0,1,69.34,194,8,8,0,1,0,58.67,206a103.32,103.32,0,0,0,69.26,26l2.17,0a104,104,0,0,0,72-177ZM124,112a12,12,0,1,1,12-12A12,12,0,0,1,124,112Z"/></symbol>
+</svg>
+
+<h1>Caballo Blanco · propuesta de diseño</h1>
+<p class="sub">Estilo Apple + historias. Paleta propia (crema, dorado, marrón). Caballo: icono "horse" de Phosphor Icons (licencia MIT). Contraste AA comprobado en claro y oscuro.</p>
+
+<div class="fila">
+  <!-- Inicio, modo claro -->
+  <div><div class="tel"><div class="pant">
+    <div class="barra"><span>9:41</span><span>●●● ⌁ ▮</span></div>
+    <div class="tit"><b>Hoy</b><div class="ic">⚙︎</div></div>
+    <div class="historias">
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rfrase) 100%,var(--border) 0)"><div class="in">“</div></div><span>Frase</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rracha) 71%,var(--border) 0)"><div class="in">12</div></div><span>Racha</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rxp) 62%,var(--border) 0)"><div class="in horse"><svg width="28" height="28"><use href="#horse"/></svg></div></div><span>Nivel 4</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rprod) 43%,var(--border) 0)"><div class="in" style="font-size:13px">2/30</div></div><span>Día 6</span></div>
+    </div>
+    <div class="tarjeta">
+      <div class="eti">MISIÓN DE LA TARDE</div>
+      <div class="mision">Graba y sube 1 vídeo en una calle tranquila</div>
+      <div class="prod">Lámpara · Día 6/14 · 🟢 2/14</div>
+      <button class="btn">✓  Hecho</button>
+    </div>
+    <div class="tarjeta lista">
+      <div class="mini">TAMBIÉN HOY</div>
+      <div class="item">Revisa las métricas de Lámpara<div class="check"></div></div>
+      <div class="item">Graba 1 vídeo (noche)<div class="check"></div></div>
+    </div>
+    <div class="ghost">Saltar hoy</div>
+    <div class="tab"><div class="on">◉<span>Hoy</span></div><div>◎<span>Productos</span></div><div>☰<span>Más</span></div></div>
+  </div></div><p class="nota"><b>Inicio (claro).</b> Arriba las historias con anillos; la misión de ahora en grande con un solo botón; el resto, en lista.</p></div>
+
+  <!-- Inicio, modo oscuro -->
+  <div><div class="tel"><div class="pant dark">
+    <div class="barra"><span>22:10</span><span>●●● ⌁ ▮</span></div>
+    <div class="tit"><b>Hoy</b><div class="ic">⚙︎</div></div>
+    <div class="historias">
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rfrase) 100%,var(--border) 0)"><div class="in">“</div></div><span>Frase</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rracha) 71%,var(--border) 0)"><div class="in">12</div></div><span>Racha</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rxp) 62%,var(--border) 0)"><div class="in horse"><svg width="28" height="28"><use href="#horse"/></svg></div></div><span>Nivel 4</span></div>
+      <div class="hist"><div class="anillo" style="background:conic-gradient(var(--rprod) 43%,var(--border) 0)"><div class="in" style="font-size:13px">2/30</div></div><span>Día 6</span></div>
+    </div>
+    <div class="tarjeta">
+      <div class="eti">MISIÓN DE LA NOCHE</div>
+      <div class="mision">Revisa las métricas de Lámpara</div>
+      <div class="prod">Lámpara · Día 6/14 · 🧗 bajón</div>
+      <button class="btn">✓  Hecho</button>
+    </div>
+    <div class="tarjeta lista">
+      <div class="mini">TAMBIÉN HOY</div>
+      <div class="item">Graba 1 vídeo (noche)<div class="check"></div></div>
+    </div>
+    <div class="ghost">Saltar hoy</div>
+    <div class="tab"><div class="on">◉<span>Hoy</span></div><div>◎<span>Productos</span></div><div>☰<span>Más</span></div></div>
+  </div></div><p class="nota"><b>Inicio (oscuro).</b> Automático según el iPhone.</p></div>
+
+  <!-- Visor de historia -->
+  <div><div class="tel"><div class="visor">
+    <div class="progreso"><i class="on"></i><i></i><i></i><i></i></div>
+    <div style="display:flex;gap:8px;align-items:center;padding:12px 14px;font-size:13px;font-weight:600"><span class="horse" style="color:#1F1A14"><svg width="22" height="22"><use href="#horse"/></svg></span>Frase del día</div>
+    <div class="frase">Un vídeo malo no te mata: solo te enseña cómo es el nivel.</div>
+    <div class="autor">— Víctor Heras</div>
+  </div></div><p class="nota"><b>Historia abierta.</b> Pantalla completa, toque para pasar. Sin avance automático.</p></div>
+</div>
+
+<div class="fila">
+  <div><div class="home">
+    <div class="w w-med">
+      <div class="w-fr">“Un vídeo malo no te mata: solo te enseña cómo es el nivel.”</div>
+      <div class="w-ab">
+        <span class="horse"><svg width="36" height="36"><use href="#horse"/></svg></span>
+        <div><div style="font-size:12px;font-weight:700">Nv 4 · 🔥12</div><div class="bar"><i></i></div>
+          <div style="font-size:12.5px;font-weight:600;margin-top:6px;max-width:150px">Graba 1 vídeo · calle tranquila</div></div>
+        <div class="w-ok">✓</div>
+      </div>
+    </div>
+  </div><p class="nota"><b>Widget mediano.</b> Frase arriba, caballo + misión abajo, ✅ sin abrir la app. Respeta claro/oscuro.</p></div>
+
+  <div><div class="lock">
+    <div style="font-size:16px;opacity:.85">lunes 26 de octubre</div>
+    <div class="hora">17:10</div>
+    <div class="lw">
+      <div class="lrect"><svg width="22" height="22" style="color:#fff"><use href="#horse"/></svg><div><b>Nv 4 · 🔥12</b><br>Graba 1 vídeo</div><div style="margin-left:auto;width:22px;height:22px;border-radius:50%;border:2px solid #fff"></div></div>
+      <div class="lcirc" style="background:conic-gradient(#fff 71%,rgba(255,255,255,.2) 0)"><div style="width:46px;height:46px;border-radius:50%;background:#1a232b;display:grid;place-items:center">🔥12</div></div>
+    </div>
+    <div class="act">
+      <div style="display:flex;gap:10px;align-items:center">
+        <svg width="34" height="34" style="color:#E3A84A"><use href="#horse"/></svg>
+        <div style="font-size:13px;font-weight:700">Nv 4 · Jinete · 🔥12 · 🛡️2</div>
+      </div>
+      <div class="fr">“Un vídeo malo no te mata: solo te enseña cómo es el nivel.”</div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div><div style="font-size:10px;font-weight:700;opacity:.65">MISIÓN DE LA TARDE</div><div style="font-size:15px;font-weight:600">Graba 1 vídeo en una calle tranquila</div></div>
+        <div class="ok">✓</div>
+      </div>
+    </div>
+  </div><p class="nota"><b>Pantalla de bloqueo.</b> Widgets rectangular y circular (anillo de racha) + tarjeta grande translúcida.</p></div>
+
+  <div style="display:flex;gap:18px">
+    <div style="text-align:center"><div style="width:96px;height:96px;border-radius:50%;background:#FBF8F3;display:grid;place-items:center;box-shadow:0 0 0 6px rgba(227,168,74,.35),0 0 30px rgba(227,168,74,.6)"><svg width="56" height="56" style="color:#A86F15"><use href="#horse"/></svg></div><p class="nota">Radiante</p></div>
+    <div style="text-align:center"><div style="width:96px;height:96px;border-radius:50%;background:#FBF8F3;display:grid;place-items:center"><svg width="56" height="56" style="color:#1F1A14"><use href="#horse"/></svg></div><p class="nota">Normal</p></div>
+    <div style="text-align:center"><div style="width:96px;height:96px;border-radius:50%;background:#FBF8F3;display:grid;place-items:center;opacity:.75"><svg width="56" height="56" style="color:#675D52"><use href="#horse"/></svg></div><p class="nota">Con barro</p></div>
+  </div>
+</div>
+</body>
+</html>
