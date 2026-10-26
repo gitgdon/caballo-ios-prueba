@@ -47,17 +47,6 @@ final class Modelo: ObservableObject {
 private let marron = Color(red: 0.23, green: 0.16, blue: 0.11)
 private let dorado = Color(red: 0.85, green: 0.55, blue: 0.25)
 
-struct Tarjeta<Contenido: View>: View {
-    @ViewBuilder let contenido: Contenido
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) { contenido }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 16))
-    }
-}
-
 struct Inicio: View {
     @StateObject private var modelo = Modelo()
     @Environment(\.scenePhase) private var fase
