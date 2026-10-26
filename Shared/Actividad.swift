@@ -54,7 +54,8 @@ enum Actividad {
     static func actualizar(_ v: Vista?) async {
         guard activada else { await apagar(); return }
         guard let v, ActivityAuthorizationInfo().areActivitiesEnabled else { return }
-        let nuevo = ActivityContent(state: contenido(v), staleDate: nil)
+        // Prioridad mínima: si hay otras actividades, la isla prefiere las demás.
+        let nuevo = ActivityContent(state: contenido(v), staleDate: nil, relevanceScore: 0)
         let actuales = Activity<CaballoAtributos>.activities
         if let a = actuales.first(where: { $0.attributes.dia == hoy && $0.activityState == .active }) {
             await a.update(nuevo)

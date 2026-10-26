@@ -89,14 +89,16 @@ struct CaballoActividad: Widget {
                     }
                 }
             } compactLeading: {
-                // Sin contenido a propósito: iOS no permite quitar la isla dinámica,
-                // así que se deja vacía para que se vea como la píldora normal.
-                EmptyView()
+                // Experimento: contenido de ancho cero para que la isla crezca lo mínimo posible.
+                Color.clear.frame(width: 0, height: 0)
             } compactTrailing: {
-                EmptyView()
+                Color.clear.frame(width: 0, height: 0)
             } minimal: {
-                EmptyView()
+                Color.clear.frame(width: 0, height: 0)
             }
+            .contentMargins(.all, 0, for: .compactLeading)
+            .contentMargins(.all, 0, for: .compactTrailing)
+            .contentMargins(.all, 0, for: .minimal)
         }
     }
 }
