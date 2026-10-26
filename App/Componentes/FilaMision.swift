@@ -37,8 +37,19 @@ struct FilaMision: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Marcar como hecha")
+            .accessibilityLabel("Marcar como hecha: \(mision.texto)")
+            .accessibilityAddTraits(marcada ? .isSelected : [])
         }
         .opacity(marcada ? 0.5 : 1)
     }
+}
+
+#Preview("Fila claro") {
+    FilaMision(mision: Vista.Mision(id: "m1", texto: "Graba 1 vídeo", bloque: "tarde", tipo: "normal"), hecho: {})
+        .padding().background(Tema.fondo)
+}
+
+#Preview("Fila oscuro") {
+    FilaMision(mision: Vista.Mision(id: "m1", texto: "Graba 1 vídeo", bloque: "tarde", tipo: "normal"), hecho: {})
+        .padding().background(Tema.fondo).preferredColorScheme(.dark)
 }

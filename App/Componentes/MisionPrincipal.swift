@@ -37,3 +37,14 @@ struct MisionPrincipal: View {
         }
     }
 }
+
+#Preview("Misión claro") {
+    MisionPrincipal(mision: Vista.Mision(id: "m1", texto: "Graba 1 vídeo", bloque: "tarde", tipo: "normal"),
+                    lineaProducto: "Producto 1 · día 3", textoVacio: "Día cerrado. Descansa, jinete.", hecho: {})
+        .padding().background(Tema.fondo)
+}
+
+#Preview("Misión oscuro") {
+    MisionPrincipal(mision: nil, lineaProducto: nil, textoVacio: "Día cerrado. Descansa, jinete.", hecho: {})
+        .padding().background(Tema.fondo).preferredColorScheme(.dark)
+}

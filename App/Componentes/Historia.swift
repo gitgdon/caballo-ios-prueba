@@ -3,15 +3,17 @@ import SwiftUI
 /// Círculo de 64 pt con anillo de progreso y etiqueta debajo.
 struct Historia<Contenido: View>: View {
     let titulo: String
+    let etiqueta: String?
     let progreso: Double
     let color: Color
     let nueva: Bool
     let contenido: Contenido
     let accion: () -> Void
 
-    init(titulo: String, progreso: Double, color: Color, nueva: Bool,
+    init(titulo: String, etiqueta: String? = nil, progreso: Double, color: Color, nueva: Bool,
          @ViewBuilder contenido: () -> Contenido, accion: @escaping () -> Void) {
         self.titulo = titulo
+        self.etiqueta = etiqueta
         self.progreso = progreso
         self.color = color
         self.nueva = nueva
@@ -28,11 +30,14 @@ struct Historia<Contenido: View>: View {
             VStack(spacing: Espacio.xs) {
                 ZStack {
                     Circle().stroke(Tema.borde, lineWidth: grosor)
+                        .frame(width: lado - grosor, height: lado - grosor)
                     Circle()
                         .trim(from: 0, to: max(0, min(1, progreso)))
                         .stroke(color, style: StrokeStyle(lineWidth: grosor, lineCap: .round))
+                        .frame(width: lado - grosor, height: lado - grosor)
                         .rotationEffect(.degrees(-90))
                         .opacity(nueva ? 1 : 0.4)
+                        .shadow(color: nueva ? color.opacity(0.5) : .clear, radius: 6)
                     contenido
                         .frame(width: lado - 2 * (grosor + hueco), height: lado - 2 * (grosor + hueco))
                         .background(Tema.superficie2, in: Circle())
@@ -46,7 +51,7 @@ struct Historia<Contenido: View>: View {
             .frame(minWidth: 64, minHeight: 44)
         }
         .buttonStyle(EstiloHistoria())
-        .accessibilityLabel(titulo)
+        .accessibilityLabel(etiqueta ?? titulo)
     }
 }
 

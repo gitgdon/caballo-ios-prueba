@@ -53,7 +53,7 @@ struct VisorHistorias: View {
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 20).onEnded { valor in
-                if valor.translation.height > 80 { cerrar() }
+                if valor.translation.height > 80 && abs(valor.translation.width) < valor.translation.height { cerrar() }
             })
     }
 
