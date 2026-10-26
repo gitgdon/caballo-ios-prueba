@@ -11,7 +11,7 @@ struct Hoy: View {
             if let v = modelo.vista {
                 VStack(alignment: .leading, spacing: Espacio.m) {
                     cabecera(v)
-                    FilaHistorias(vista: v)
+                    FilaHistorias(vista: v, aviso: $modelo.aviso)
                     contenido(v)
                 }
                 .padding(.bottom, Espacio.xl)
@@ -20,8 +20,9 @@ struct Hoy: View {
         .background(Tema.fondo)
         .sheet(isPresented: $hojaSaltar) {
             HojaSaltar(modelo: modelo)
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
                 .presentationBackground(Tema.fondo)
+                .avisoLogro(texto: $modelo.aviso)
         }
     }
 
@@ -91,13 +92,15 @@ struct Hoy: View {
 /// Las historias de arriba y su visor a pantalla completa.
 private struct FilaHistorias: View {
     let vista: Vista
+    /// El aviso se repite encima del visor para que no caduque tapado.
+    @Binding var aviso: String?
     @AppStorage("medallaVista") private var medallaVista = 0
     @AppStorage("historiasVistas") private var historiasVistas = ""
     @State private var visor: VisorAbierto?
 
     private static let medallas = [7, 30, 100, 365]
 
-    private enum Tipo: Hashable { case frase, racha, nivel, producto, medalla }
+    private enum Tipo: String, Hashable { case frase, racha, nivel, producto, medalla }
 
     private struct VisorAbierto: Identifiable {
         let id = UUID()
@@ -111,7 +114,20 @@ private struct FilaHistorias: View {
         return f.string(from: .now)
     }
 
-    private var nuevas: Bool { historiasVistas != Self.hoy }
+    /// "yyyy-MM-dd:frase,racha": las historias vistas hoy. Cada una brilla hasta que se abre.
+    private var vistasHoy: [String] {
+        let partes = historiasVistas.split(separator: ":", maxSplits: 1).map(String.init)
+        guard partes.count == 2, partes[0] == Self.hoy else { return [] }
+        return partes[1].split(separator: ",").map(String.init)
+    }
+
+    private func nueva(_ t: Tipo) -> Bool { !vistasHoy.contains(t.rawValue) }
+
+    private func marcarVista(_ t: Tipo) {
+        var vistas = vistasHoy
+        if !vistas.contains(t.rawValue) { vistas.append(t.rawValue) }
+        historiasVistas = Self.hoy + ":" + vistas.joined(separator: ",")
+    }
 
     private var medallaNueva: Int? {
         guard let m = vista.medallas.max(), m > medallaVista else { return nil }
@@ -121,7 +137,9 @@ private struct FilaHistorias: View {
     private var siguienteMedalla: Int? { Self.medallas.first { $0 > vista.racha } }
 
     private var tipos: [Tipo] {
-        var t: [Tipo] = [.frase, .racha, .nivel]
+        var t: [Tipo] = []
+        if vista.frase != nil || vista.porque != nil { t.append(.frase) }
+        t.append(contentsOf: [.racha, .nivel])
         if vista.producto != nil { t.append(.producto) }
         if medallaNueva != nil { t.append(.medalla) }
         return t
@@ -139,13 +157,14 @@ private struct FilaHistorias: View {
         }
         .fullScreenCover(item: $visor) { abierto in
             VisorHistorias(paginas: abierto.paginas, inicio: abierto.inicio)
+                .avisoLogro(texto: $aviso)
         }
     }
 
     private func abrir(_ t: Tipo) {
         let lista = tipos
         visor = VisorAbierto(paginas: lista.map { pagina($0) }, inicio: lista.firstIndex(of: t) ?? 0)
-        historiasVistas = Self.hoy
+        marcarVista(t)
         if t == .medalla, let m = medallaNueva { medallaVista = m }
     }
 
@@ -164,7 +183,7 @@ private struct FilaHistorias: View {
     private var historiaFrase: some View {
         Historia(titulo: "Frase",
                  etiqueta: vista.porque != nil ? "Tu porqué" : "Frase del día",
-                 progreso: 1, color: Tema.Anillo.frase, nueva: nuevas,
+                 progreso: 1, color: Tema.Anillo.frase, nueva: nueva(.frase),
                  contenido: {
                      Text("“")
                          .font(.system(size: 28, weight: .bold, design: .rounded))
@@ -182,7 +201,7 @@ private struct FilaHistorias: View {
     private var historiaRacha: some View {
         let progreso = siguienteMedalla.map { Double(vista.racha) / Double($0) } ?? 1
         return Historia(titulo: "Racha", etiqueta: etiquetaRacha,
-                        progreso: progreso, color: Tema.Anillo.racha, nueva: nuevas,
+                        progreso: progreso, color: Tema.Anillo.racha, nueva: nueva(.racha),
                         contenido: {
                             Text("\(vista.racha)")
                                 .font(.system(size: 17, weight: .bold, design: .rounded))
@@ -196,7 +215,7 @@ private struct FilaHistorias: View {
         let progreso = Double(vista.xp) / Double(max(vista.xpSig, 1))
         return Historia(titulo: "Nivel \(vista.nivel)",
                         etiqueta: "Nivel \(vista.nivel), \(vista.rango): \(vista.xp) de \(vista.xpSig) XP",
-                        progreso: progreso, color: Tema.Anillo.xp, nueva: nuevas,
+                        progreso: progreso, color: Tema.Anillo.xp, nueva: nueva(.nivel),
                         contenido: { Caballo(humor: vista.humor, lado: 50) },
                         accion: { abrir(.nivel) })
     }
@@ -210,7 +229,7 @@ private struct FilaHistorias: View {
         let dia = vista.producto?.dia ?? 0
         return Historia(titulo: dia > 0 ? "Día \(dia)" : "Producto",
                         etiqueta: "Producto \(textoProducto)" + (dia > 0 ? ", día \(dia) de 14" : ""),
-                        progreso: Double(dia) / 14, color: Tema.Anillo.producto, nueva: nuevas,
+                        progreso: Double(dia) / 14, color: Tema.Anillo.producto, nueva: nueva(.producto),
                         contenido: {
                             Text(textoProducto)
                                 .font(.system(size: 13, weight: .bold, design: .rounded))

@@ -5,7 +5,6 @@ struct Productos: View {
     @ObservedObject var modelo: Modelo
     @Binding var hojaNuevo: Bool
     @State private var productoPara: Vista.ProductoFila?
-    @State private var plataformaPara: String?
 
     var body: some View {
         NavigationStack {
@@ -28,7 +27,7 @@ struct Productos: View {
                     }
                     .listRowBackground(Tema.superficie)
                 }
-                seccion("En marcha", v.productos.filter { $0.estado != "descartado" }, v)
+                seccion("En marcha", enMarcha(v.productos), v)
                 seccion("Descartados", v.productos.filter { $0.estado == "descartado" }, v)
             }
         }
@@ -38,16 +37,10 @@ struct Productos: View {
             set: { if !$0 { productoPara = nil } }
         ), titleVisibility: .visible) {
             Button("🟢 Un vídeo ha funcionado") { ejecutar("ganador") }
-            Button("🔥 Un vídeo ha pasado de 10k") { ejecutar("viral") }
+            Button("🔥 10k en TikTok") { ejecutar("viral", "tiktok") }
+            Button("🔥 10k en Instagram") { ejecutar("viral", "instagram") }
+            Button("🔥 10k en YouTube Shorts") { ejecutar("viral", "youtube") }
             Button("💰 He vendido") { ejecutar("vendido") }
-        }
-        .confirmationDialog("¿En qué plataforma?", isPresented: Binding(
-            get: { plataformaPara != nil },
-            set: { if !$0 { plataformaPara = nil } }
-        ), titleVisibility: .visible) {
-            Button("TikTok") { viral("tiktok") }
-            Button("Instagram") { viral("instagram") }
-            Button("YouTube Shorts") { viral("youtube") }
         }
     }
 
@@ -73,15 +66,28 @@ struct Productos: View {
         }
     }
 
-    private func ejecutar(_ accion: String) {
-        guard let p = productoPara else { return }
-        productoPara = nil
-        if accion == "viral" { plataformaPara = p.id } else { modelo.hacer(accion, [p.id]) }
+    /// Los activos (test, vendiendo) primero, luego decisión y preparación; sin descartados.
+    private func enMarcha(_ productos: [Vista.ProductoFila]) -> [Vista.ProductoFila] {
+        func orden(_ estado: String) -> Int {
+            switch estado {
+            case "test", "vendiendo": return 0
+            case "decision": return 1
+            default: return 2
+            }
+        }
+        return productos.enumerated()
+            .filter { $0.element.estado != "descartado" }
+            .sorted { a, b in
+                let oa = orden(a.element.estado), ob = orden(b.element.estado)
+                return oa != ob ? oa < ob : a.offset < b.offset
+            }
+            .map { $0.element }
     }
 
-    private func viral(_ plataforma: String) {
-        if let id = plataformaPara { modelo.hacer("viral", [id, plataforma]) }
-        plataformaPara = nil
+    private func ejecutar(_ accion: String, _ extra: String? = nil) {
+        guard let p = productoPara else { return }
+        productoPara = nil
+        modelo.hacer(accion, [p.id] + (extra.map { [$0] } ?? []))
     }
 }
 

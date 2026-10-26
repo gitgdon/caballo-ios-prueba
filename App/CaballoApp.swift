@@ -71,6 +71,7 @@ struct Raiz: View {
             .padding(Espacio.l)
             .presentationDetents([.medium])
             .presentationBackground(Tema.fondo)
+            .avisoLogro(texto: $modelo.aviso)
         }
         .confirmationDialog("¿Empezar otro producto en paralelo?", isPresented: $modelo.ofrecerParalelo, titleVisibility: .visible) {
             Button("Sí") { hojaNuevo = true }

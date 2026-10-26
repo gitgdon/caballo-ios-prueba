@@ -32,7 +32,9 @@ private struct ModificadorAvisoLogro: ViewModifier {
                         .accessibilityAddTraits(.isButton)
                         .accessibilityHint("Toca para cerrar")
                         .task(id: valor) {
-                            try? await Task.sleep(nanoseconds: 3_000_000_000)
+                            // Más tiempo cuanto más largo (el del bajón ronda los 9 s).
+                            let segundos = max(3, Double(valor.count) / 15)
+                            try? await Task.sleep(nanoseconds: UInt64(segundos * 1_000_000_000))
                             if !Task.isCancelled { texto = nil }
                         }
                 }
@@ -42,7 +44,7 @@ private struct ModificadorAvisoLogro: ViewModifier {
 }
 
 extension View {
-    /// Muestra un aviso de logro arriba; se quita a los 3 s o al tocarlo.
+    /// Muestra un aviso de logro arriba; se quita al tocarlo o pasado un tiempo según su largo (mínimo 3 s).
     func avisoLogro(texto: Binding<String?>) -> some View {
         modifier(ModificadorAvisoLogro(texto: texto))
     }

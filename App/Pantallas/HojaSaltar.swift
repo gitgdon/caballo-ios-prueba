@@ -11,8 +11,10 @@ struct HojaSaltar: View {
                 .font(.system(size: 22, weight: .bold))
                 .foregroundStyle(Tema.texto)
             if let v = modelo.vista {
-                textos(v)
-                Spacer(minLength: 0)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: Espacio.m) { textos(v) }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 botones(v)
             }
         }
