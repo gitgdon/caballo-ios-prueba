@@ -7,6 +7,10 @@ struct Vista: Decodable {
     struct Frase: Decodable { let texto: String; let autor: String; let detalle: String; let video: String }
     struct Producto: Decodable { let n: Int; let nombre: String; let dia: Int; let ganadores: Int; let videos: Int; let bajon: Bool }
     struct Ref: Decodable, Identifiable { let id: String; let nombre: String }
+    struct ProductoFila: Decodable, Identifiable {
+        let id: String, nombre: String, estado: String, lugar: String
+        let dia: Int, videos: Int, ganadores: Int
+    }
 
     let nivel: Int, rango: String, xp: Int, xpSig: Int
     let racha: Int, escudos: Int, humor: String
@@ -14,6 +18,41 @@ struct Vista: Decodable {
     let hayProductos: Bool, pendientes: [Mision], decisiones: [Ref], vendibles: [Ref]
     let puedeMinimo: Bool, efectoSaltar: String, puedeNuevo: Bool
     let bajon: [String], textoBajon: String?, porqueGuardado: String?, fraseSaltar: String?
+    let productos: [ProductoFila], medallas: [Int]
+
+    enum CodingKeys: String, CodingKey {
+        case nivel, rango, xp, xpSig, racha, escudos, humor, mision, frase, porque, producto
+        case hayProductos, pendientes, decisiones, vendibles, puedeMinimo, efectoSaltar, puedeNuevo
+        case bajon, textoBajon, porqueGuardado, fraseSaltar, productos, medallas
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        nivel = try c.decode(Int.self, forKey: .nivel)
+        rango = try c.decode(String.self, forKey: .rango)
+        xp = try c.decode(Int.self, forKey: .xp)
+        xpSig = try c.decode(Int.self, forKey: .xpSig)
+        racha = try c.decode(Int.self, forKey: .racha)
+        escudos = try c.decode(Int.self, forKey: .escudos)
+        humor = try c.decode(String.self, forKey: .humor)
+        mision = try c.decodeIfPresent(Mision.self, forKey: .mision)
+        frase = try c.decodeIfPresent(Frase.self, forKey: .frase)
+        porque = try c.decodeIfPresent(String.self, forKey: .porque)
+        producto = try c.decodeIfPresent(Producto.self, forKey: .producto)
+        hayProductos = try c.decode(Bool.self, forKey: .hayProductos)
+        pendientes = try c.decode([Mision].self, forKey: .pendientes)
+        decisiones = try c.decode([Ref].self, forKey: .decisiones)
+        vendibles = try c.decode([Ref].self, forKey: .vendibles)
+        puedeMinimo = try c.decode(Bool.self, forKey: .puedeMinimo)
+        efectoSaltar = try c.decode(String.self, forKey: .efectoSaltar)
+        puedeNuevo = try c.decode(Bool.self, forKey: .puedeNuevo)
+        bajon = try c.decode([String].self, forKey: .bajon)
+        textoBajon = try c.decodeIfPresent(String.self, forKey: .textoBajon)
+        porqueGuardado = try c.decodeIfPresent(String.self, forKey: .porqueGuardado)
+        fraseSaltar = try c.decodeIfPresent(String.self, forKey: .fraseSaltar)
+        productos = try c.decodeIfPresent([ProductoFila].self, forKey: .productos) ?? []
+        medallas = try c.decodeIfPresent([Int].self, forKey: .medallas) ?? []
+    }
 
     var lineaNivel: String {
         "Nv \(nivel) · \(rango)" + (racha > 0 ? " · 🔥\(racha)" : "") + (escudos > 0 ? " · 🛡️\(escudos)" : "")

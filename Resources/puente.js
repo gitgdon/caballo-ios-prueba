@@ -40,6 +40,14 @@ function vista(json) {
     textoBajon: bajon.length ? bajonText(bajon) : null,
     porqueGuardado: s.why || null,
     fraseSaltar: sq ? sq.texto : null,
+    productos: s.products.map(function (x) {
+      return {
+        id: x.id, nombre: x.name, estado: x.status, lugar: x.place,
+        dia: x.status === 'test' ? testDay(x, hoy) : 0,
+        videos: x.videos || 0, ganadores: x.winners || 0,
+      };
+    }),
+    medallas: s.medals || [],
   });
 }
 
