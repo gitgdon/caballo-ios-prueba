@@ -65,6 +65,7 @@ La auditoría (riesgo de Kelbert: abandonar la primera semana) dejó 4 puntos ab
 - Reto: **facturar más de 10.000 € antes del 31 de diciembre de 2026** (Q4).
 - Nadie lo ve y no hay botón de compartir.
 - La facturación la **apunta él a mano**: el total que le marca la tienda, de vez en cuando.
+- Los 10k son **la suma de todos los productos**. Es un solo número para todo el negocio, no uno por producto.
 
 **Cómo funciona**
 - **Historia "Reto"** en la fila de Hoy:
@@ -132,4 +133,5 @@ Misiones normales, racha, escudos, "Saltar hoy", productos, "He vendido", decisi
 - La lista de técnicas y encuentros, a partir de la investigación.
 - Los colores de los rangos, como tokens nuevos que pasen el contraste.
 - Cómo se programa y reprograma la cola de avisos, dentro del límite de iOS de 64 pendientes.
-- Si `WHorse/src/core.js` (la versión de Scriptable) recibe los mismos cambios. **Mi decisión:** no; la app nativa es la que se usa y la copia de Scriptable queda congelada.
+- La versión de Scriptable (`WHorse/src/`) **ya no se usa** (confirmado por el usuario). No recibe estos cambios.
+- La subida progresiva de la primera semana (1, 1, 2, 2, 2, 3, 3 vídeos y luego 3 al día) **se mantiene** (confirmado por el usuario).
