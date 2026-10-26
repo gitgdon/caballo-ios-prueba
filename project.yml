@@ -27,6 +27,7 @@ targets:
       properties:
         CFBundleDisplayName: Caballo Blanco
         UILaunchScreen: {}
+        NSSupportsLiveActivities: true
     entitlements:
       path: App/App.entitlements
       properties:

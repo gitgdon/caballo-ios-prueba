@@ -22,7 +22,14 @@ final class Modelo: ObservableObject {
             aviso = texto
             vista = juego.vista()
         }
+        actualizarFuera()
+    }
+
+    /// Widgets y tarjeta de la pantalla de bloqueo.
+    private func actualizarFuera() {
         WidgetCenter.shared.reloadAllTimelines()
+        let v = vista
+        Task { await Actividad.actualizar(v) }
     }
 
     func hacer(_ nombre: String, _ args: [String] = []) {
@@ -33,7 +40,7 @@ final class Modelo: ObservableObject {
             if !mensajes.isEmpty { aviso = mensajes.joined(separator: "\n") }
         }
         vista = juego.vista()
-        WidgetCenter.shared.reloadAllTimelines()
+        actualizarFuera()
     }
 }
 

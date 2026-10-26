@@ -156,6 +156,13 @@ struct VistaWidget: View {
 }
 
 @main
+struct CaballoWidgets: WidgetBundle {
+    var body: some Widget {
+        CaballoWidget()
+        CaballoActividad()
+    }
+}
+
 struct CaballoWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "CaballoBlanco", provider: Proveedor()) { entrada in
