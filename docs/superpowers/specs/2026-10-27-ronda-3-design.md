@@ -21,7 +21,7 @@ La auditoría (riesgo de Kelbert: abandonar la primera semana) dejó 4 puntos ab
 - Avisos que culpan o castigan. El tono es de empujón, nunca de reproche.
 - Avisos que siguen llegando después de haber marcado la misión.
 - Compartir, testigos o cualquier cosa que enseñe su progreso a otros.
-- Pantallas o pestañas nuevas. Todo cabe en historias, hojas, Más y widgets.
+- Pestañas nuevas. Todo cabe en historias, hojas, filas de Más y widgets.
 - Tocar la **tarjeta de bloqueo** (Actividad en directo) o la **isla dinámica**: se quedan exactamente como están.
 - Frases nuevas inventadas o cambiar el texto de `frases.js`.
 
@@ -103,6 +103,10 @@ La auditoría (riesgo de Kelbert: abandonar la primera semana) dejó 4 puntos ab
   - Hacen falta unas 15, una por nivel hasta la Leyenda.
 - **Encuentros raros:** más o menos una vez por semana, sin aviso previo, sale una misión especial con más XP (ej. "Graba 3 ganchos distintos del mismo producto"). Es determinista por día, igual que la frase del día.
 - **Medallas ocultas:** no se ven hasta conseguirlas y no se sabe cuántas hay. Mínimo: primer vídeo, primer vídeo en la calle, primera semana sin saltar, reto cumplido.
+- **Apartado "Técnicas" en Más** (pedido por el usuario): lista de todas las técnicas. Las desbloqueadas se abren y se pueden releer; las bloqueadas salen con 🔒 y el nivel que hace falta. Es una fila más en Más, no una pestaña nueva.
+- **De dónde salen las técnicas** (pedido por el usuario): de gente que hace ecommerce y dropshipping, no solo de marca personal.
+  - Fuentes: Marc Verdú (youtube.com/@MarcVerdu), los ganchos de Víctor Heras que sirven para producto y otros canales de ecommerce o dropshipping orgánico que se buscarán y el usuario aprobará antes de transcribirlos.
+  - Mismo método que en las rondas anteriores: transcripciones, ideas reescritas y nunca copiadas, con el vídeo de origen anotado.
 - **Mis decisiones sobre cómo encaja:**
   - **Técnicas:** 15, una por nivel del 1 al 15. Al actualizar, se desbloquean sin ruido las de los niveles ya alcanzados, con una sola historia "Técnicas desbloqueadas: N". Después, una historia por cada subida de nivel.
   - **Medallas ocultas:** se guardan en un campo propio (no en `medals`, que son días de racha) y no se conceden con efecto retroactivo.
