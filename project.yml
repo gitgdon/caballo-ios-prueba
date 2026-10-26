@@ -13,7 +13,11 @@ targets:
   CaballoPrueba:
     type: application
     platform: iOS
-    sources: [App, Shared]
+    sources:
+      - App
+      - Shared
+      - path: Resources
+        buildPhase: resources
     scheme: {}
     settings:
       base:
@@ -21,7 +25,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Caballo Prueba
+        CFBundleDisplayName: Caballo Blanco
         UILaunchScreen: {}
     entitlements:
       path: App/App.entitlements
@@ -32,14 +36,18 @@ targets:
   CaballoWidget:
     type: app-extension
     platform: iOS
-    sources: [Widget, Shared]
+    sources:
+      - Widget
+      - Shared
+      - path: Resources
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.caballoblanco.prueba.widget
     info:
       path: Widget/Info.plist
       properties:
-        CFBundleDisplayName: Caballo Widget
+        CFBundleDisplayName: Caballo Blanco
         NSExtension:
           NSExtensionPointIdentifier: com.apple.widgetkit-extension
     entitlements:
