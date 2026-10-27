@@ -5,13 +5,16 @@ import UserNotifications
 enum Avisos {
     static let categoria = "MISION"
     static let accionHecho = "HECHO"
+    /// El aviso de racha no lleva "Hecho": marcaría un vídeo que no se ha hecho.
+    static let categoriaRacha = "RACHA"
     private static let prefijo = "aviso-"
 
     /// La acción "Hecho" se ejecuta sin abrir la app.
     static func registrarCategoria() {
         let hecho = UNNotificationAction(identifier: accionHecho, title: "Hecho", options: [])
         let cat = UNNotificationCategory(identifier: categoria, actions: [hecho], intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([cat])
+        let racha = UNNotificationCategory(identifier: categoriaRacha, actions: [], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([cat, racha])
     }
 
     static func pedirPermisoSiHaceFalta() async {
@@ -22,7 +25,6 @@ enum Avisos {
 
     /// Quita los avisos pendientes y programa los del plan actual.
     static func reprogramar(_ juego: Juego) async {
-        let plan = juego.avisos()
         let centro = UNUserNotificationCenter.current()
         let viejos = await centro.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefijo) }
         centro.removePendingNotificationRequests(withIdentifiers: viejos)
@@ -32,13 +34,14 @@ enum Avisos {
         default: return
         }
 
-        for aviso in plan {
+        // Se lee después de quitar los pendientes, para no volver a poner avisos viejos.
+        for aviso in juego.avisos() {
             guard let cuando = componentes(aviso.fecha) else { continue }
             let contenido = UNMutableNotificationContent()
             contenido.title = aviso.titulo
             contenido.body = aviso.cuerpo
             contenido.sound = .default
-            contenido.categoryIdentifier = categoria
+            contenido.categoryIdentifier = aviso.tipo == "racha" ? categoriaRacha : categoria
             if let m = aviso.misionId { contenido.userInfo = ["misionId": m] }
             let disparo = UNCalendarNotificationTrigger(dateMatching: cuando, repeats: false)
             let id = aviso.id.hasPrefix(prefijo) ? aviso.id : prefijo + aviso.id
