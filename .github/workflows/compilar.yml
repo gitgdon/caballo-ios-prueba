@@ -13,6 +13,9 @@ jobs:
       - name: Instalar herramientas
         run: brew install xcodegen ldid
 
+      - name: Probar el juego
+        run: node --test test/
+
       - name: Generar proyecto de Xcode
         run: xcodegen generate
 

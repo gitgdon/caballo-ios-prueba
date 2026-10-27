@@ -64,6 +64,8 @@ function newState() {
     records: { bestVideosDay: 0 },
     quote: { day: null, id: null },
     usedQuotes: [],
+    secretas: [],
+    tecnicasVistas: 0,
   };
 }
 
@@ -77,12 +79,15 @@ function normalizeState(s) {
   s.records = Object.assign(d.records, s.records);
   s.quote = Object.assign(d.quote, s.quote);
   s.usedQuotes = s.usedQuotes || d.usedQuotes;
+  s.secretas = s.secretas || d.secretas;
+  if (s.tecnicasVistas === undefined) s.tecnicasVistas = d.tecnicasVistas;
   s.today = Object.assign(d.today, s.today);
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
     if (p.videos === undefined) p.videos = 0;
     if (p.winners === undefined) p.winners = 0;
     if (p.bajonAvisado === undefined) p.bajonAvisado = false;
+    if (p.tecnicasPracticadas === undefined) p.tecnicasPracticadas = [];
   }
   return s;
 }
@@ -116,6 +121,14 @@ const MINIMO_TEXT = 'Haz lo mínimo: graba 1 vídeo corto o 1 toma de prueba, au
 const XP_GANADOR = 50;
 const BAJON_TEXT = '🧗 Entras en los días 8–14: aquí es donde más gente lo deja. Los resultados tardan 2–4 semanas en llegar. Sigue.';
 const VIDEO_BLOCKS = { 1: ['tarde'], 2: ['tarde', 'noche'], 3: ['mañana', 'tarde', 'noche'] };
+const PRIMER_ENSAYO_TEXT = 'Graba 3 tomas en casa o en el portal, sin publicarlas';
+const PRIMER_PUBLICA_TEXT = 'Publica una, aunque no te guste';
+const SECRETAS = {
+  'primer-video': 'Primer vídeo',
+  'primera-calle': 'Primer vídeo en la calle',
+  'semana-sin-saltar': 'Una semana sin saltar',
+  'reto-cumplido': 'Reto cumplido',
+};
 
 function clone(x) {
   return JSON.parse(JSON.stringify(x));
@@ -138,6 +151,7 @@ function createProduct(state, { name, place }) {
     videos: 0,
     winners: 0,
     bajonAvisado: false,
+    tecnicasPracticadas: [],
   });
   return s;
 }
@@ -158,9 +172,40 @@ function rollDay(state, now) {
   return s;
 }
 
-function missionsForDay(state, now) {
+function totalVideos(state) {
+  return state.products.reduce((n, p) => n + p.videos, 0);
+}
+
+// Primer producto en test con misiones de vídeo hoy, mientras no se haya publicado ningún vídeo.
+function primerVideoProduct(state, day) {
+  if (totalVideos(state) > 0) return null;
+  return state.products.find((p) => p.status === 'test' && testDay(p, day) >= 1) || null;
+}
+
+function primerVideoActivo(state, now) {
+  const day = now ? dayKey(now) : state.today.day;
+  return day ? primerVideoProduct(state, day) !== null : false;
+}
+
+function tecnicasDesbloqueadas(state, tecnicas) {
+  const level = levelInfo(state.xp).level;
+  return tecnicas.filter((t) => t.nivel <= level).sort((a, b) => a.nivel - b.nivel);
+}
+
+function marcarTecnicasVistas(state, tecnicas) {
+  const s = clone(state);
+  s.tecnicasVistas = tecnicasDesbloqueadas(s, tecnicas).length;
+  return s;
+}
+
+function missionsForDay(state, now, extra) {
   const day = dayKey(now);
   const out = [];
+  const primer = primerVideoProduct(state, day);
+  const doneToday = state.today.day === day ? state.today.done : [];
+  const enTest = state.products.find((p) => p.status === 'test' && testDay(p, day) >= 1);
+  const encuentros = extra && extra.encuentros && extra.encuentros.length ? extra.encuentros : null;
+  const hRaro = hashDay(day + ':raro');
   for (const p of state.products) {
     const m = (id, block, kind, text, xp) => ({ id: p.id + ':' + id, productId: p.id, block, kind, text, xp });
     const list = [];
@@ -184,9 +229,18 @@ function missionsForDay(state, now) {
       } else if (!blocks.includes('mañana')) {
         list.push(m('ligera', 'mañana', 'ligera', 'Responde comentarios y revisa las cuentas de ' + p.name, XP_BASE));
       }
-      blocks.forEach((b, i) => {
-        list.push(m('video:' + (i + 1), b, 'video', 'Graba y sube 1 vídeo de ' + p.name + suffix, xp));
-      });
+      if (p === primer) {
+        list.push(m('primer:1', blocks[0], 'ensayo', PRIMER_ENSAYO_TEXT, XP_BASE));
+        if (doneToday.includes(p.id + ':primer:1')) list.push(m('primer:2', blocks[0], 'video', PRIMER_PUBLICA_TEXT, xp));
+      } else if (!primer) {
+        blocks.forEach((b, i) => {
+          list.push(m('video:' + (i + 1), b, 'video', 'Graba y sube 1 vídeo de ' + p.name + suffix, xp));
+        });
+      }
+      if (p === enTest && !primer && encuentros && hRaro % 7 === 0) {
+        const e = encuentros[Math.floor(hRaro / 7) % encuentros.length];
+        list.push(Object.assign(m('raro:' + e.id, 'tarde', 'raro', e.texto, e.xp), { video: e.video }));
+      }
       if (p.status === 'vendiendo' || d >= 8) {
         list.push(m('metricas', 'noche', 'metricas', 'Revisa las métricas de ' + p.name, XP_BASE));
       }
@@ -196,6 +250,14 @@ function missionsForDay(state, now) {
     list.sort((a, b) => BLOCKS.indexOf(a.block) - BLOCKS.indexOf(b.block));
     out.push(...list);
   }
+  const tecs = extra && extra.tecnicas ? tecnicasDesbloqueadas(state, extra.tecnicas) : [];
+  const hTec = hashDay(day + ':tec');
+  const firstVideo = out.find((x) => x.id.split(':')[1] === 'video');
+  if (tecs.length && hTec % 2 === 0 && firstVideo) {
+    const t = tecs[hTec % tecs.length];
+    firstVideo.text += ' ' + t.variante;
+    firstVideo.tecnica = t.id;
+  }
   if (state.today.day === day && state.today.minimo) {
     const dec = out.filter((m) => m.kind === 'decision');
     dec.push({ id: 'minimo', productId: null, block: blockOf(now), kind: 'minimo', text: MINIMO_TEXT, xp: XP_BASE });
@@ -204,14 +266,18 @@ function missionsForDay(state, now) {
   return out;
 }
 
-function pendingMissions(state, now) {
+function pendingMissions(state, now, extra) {
   if (state.today.skipped) return [];
   const done = state.today.day === dayKey(now) ? state.today.done : [];
-  return missionsForDay(state, now).filter((m) => !done.includes(m.id));
+  return missionsForDay(state, now, extra).filter((m) => !done.includes(m.id));
 }
 
-function currentMission(state, now) {
-  return pendingMissions(state, now)[0] || null;
+function currentMission(state, now, extra) {
+  return pendingMissions(state, now, extra)[0] || null;
+}
+
+function ganarSecreta(s, id) {
+  if (!s.secretas.includes(id)) s.secretas.push(id);
 }
 
 function findProduct(s, id) {
@@ -229,26 +295,33 @@ function markActive(s, d) {
   st.best = Math.max(st.best, st.current);
   if (st.current % SHIELD_EVERY === 0 && s.shields < SHIELDS_MAX) s.shields += 1;
   if (MEDALS.includes(st.current) && !s.medals.includes(st.current)) s.medals.push(st.current);
+  if (st.current === 7 && (s.lastSkipDay === null || s.lastSkipDay < st.startDay)) ganarSecreta(s, 'semana-sin-saltar');
 }
 
-function completeMission(state, missionId, now) {
+function countVideo(s, p) {
+  if (totalVideos(s) === 0) ganarSecreta(s, 'primer-video');
+  if (p.place === 'calle' && s.products.every((q) => q.place !== 'calle' || q.videos === 0)) ganarSecreta(s, 'primera-calle');
+  p.videos += 1;
+  s.today.videos += 1;
+  if (s.today.videos > s.records.bestVideosDay) {
+    if (s.records.bestVideosDay >= 1 && !s.today.recordNotified) s.today.recordNotified = true;
+    s.records.bestVideosDay = s.today.videos;
+  }
+}
+
+function completeMission(state, missionId, now, extra) {
   const s = rollDay(state, now);
-  const mission = pendingMissions(s, now).find((m) => m.id === missionId);
+  const mission = pendingMissions(s, now, extra).find((m) => m.id === missionId);
   if (!mission || mission.kind === 'decision') return s;
   const p = mission.productId ? findProduct(s, mission.productId) : null;
   s.today.done.push(mission.id);
   s.xp += mission.xp;
   s.lastActiveDay = dayKey(now);
   markActive(s, dayKey(now));
-  if (mission.kind === 'minimo') return s;
-  if (mission.kind === 'video') {
-    p.videos += 1;
-    s.today.videos += 1;
-    if (s.today.videos > s.records.bestVideosDay) {
-      if (s.records.bestVideosDay >= 1 && !s.today.recordNotified) s.today.recordNotified = true;
-      s.records.bestVideosDay = s.today.videos;
-    }
-  }
+  if (mission.kind === 'minimo' || mission.kind === 'ensayo') return s;
+  if (mission.kind === 'video' || (mission.kind === 'raro' && mission.video)) countVideo(s, p);
+  if (mission.id === p.id + ':primer:2') s.today.done.push(p.id + ':video:1');
+  if (mission.tecnica && !p.tecnicasPracticadas.includes(mission.tecnica)) p.tecnicasPracticadas.push(mission.tecnica);
   if (mission.kind === 'cuenta') {
     p.accounts[mission.id.split(':')[2]] = true;
     if (Object.values(p.accounts).every(Boolean)) {
@@ -326,15 +399,15 @@ function skipEffect(state, now) {
   return state.shields > 0 ? 'escudo' : 'pierde';
 }
 
-function canStartMinimo(state, now) {
+function canStartMinimo(state, now, extra) {
   const t = state.today;
   return t.day === dayKey(now) && !t.skipped && !t.minimo && t.done.length === 0 &&
-    pendingMissions(state, now).some((m) => m.kind !== 'decision');
+    pendingMissions(state, now, extra).some((m) => m.kind !== 'decision');
 }
 
-function startMinimo(state, now) {
+function startMinimo(state, now, extra) {
   const s = rollDay(state, now);
-  if (canStartMinimo(s, now)) s.today.minimo = true;
+  if (canStartMinimo(s, now, extra)) s.today.minimo = true;
   return s;
 }
 
@@ -407,6 +480,9 @@ function achievements(before, after) {
   if (!before.today.recordNotified && after.today.recordNotified) {
     out.push('🏆 Nuevo récord: ' + after.records.bestVideosDay + ' vídeos en un día');
   }
+  for (const id of after.secretas || []) {
+    if (!(before.secretas || []).includes(id)) out.push('🏅 Medalla oculta: ' + SECRETAS[id]);
+  }
   if (after.shields > before.shields) out.push('🛡️ Escudo ganado (tienes ' + after.shields + ')');
   const b = levelInfo(before.xp);
   const a = levelInfo(after.xp);
@@ -425,15 +501,15 @@ function hashDay(day) {
   return h;
 }
 
-function quoteCategories(state, now) {
+function quoteCategories(state, now, extra) {
   const day = dayKey(now);
   const yesterday = addDays(day, -1);
   if (state.products.some((p) => p.discardedDay === day || p.discardedDay === yesterday)) {
     return ['sin-resultados', 'imperfecto', 'desde-cero'];
   }
   if (horseMood(state, now) === 'barro') return ['sin-resultados', 'constancia', 'desde-cero'];
-  const streetVideo = missionsForDay(state, now).some(
-    (m) => m.kind === 'video' && findProduct(state, m.productId).place === 'calle'
+  const streetVideo = missionsForDay(state, now, extra).some(
+    (m) => (m.kind === 'video' || m.kind === 'ensayo') && findProduct(state, m.productId).place === 'calle'
   );
   if (streetVideo) return ['verguenza', 'imperfecto', 'accion'];
   return null;
@@ -443,7 +519,7 @@ function byId(list) {
   return list.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
-function pickDailyQuote(state, now, quotes) {
+function pickDailyQuote(state, now, quotes, extra) {
   const s = clone(state);
   const day = dayKey(now);
   if (!quotes || quotes.length === 0 || s.quote.day === day) return s;
@@ -452,7 +528,7 @@ function pickDailyQuote(state, now, quotes) {
     s.usedQuotes = [];
     unused = quotes;
   }
-  const cats = quoteCategories(s, now);
+  const cats = quoteCategories(s, now, extra);
   let candidates = cats ? unused.filter((q) => cats.includes(q.categoria)) : unused;
   if (candidates.length === 0) candidates = unused;
   candidates = byId(candidates);
@@ -486,5 +562,7 @@ if (typeof module !== 'undefined') {
     SHIELDS_MAX, SHIELD_EVERY, MINIMO_TEXT, canStartMinimo, startMinimo,
     XP_GANADOR, BAJON_TEXT, markWinner, winnerText, setWhy, whyToShow, bajonProducts,
     markBajonAvisado, bajonText, inBajon, skipEffect,
+    hashDay, totalVideos, primerVideoActivo, tecnicasDesbloqueadas, marcarTecnicasVistas, SECRETAS,
+    PRIMER_ENSAYO_TEXT, PRIMER_PUBLICA_TEXT,
   };
 }
