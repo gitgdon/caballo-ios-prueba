@@ -23,30 +23,44 @@ enum Avisos {
         _ = try? await centro.requestAuthorization(options: [.alert, .sound])
     }
 
-    /// Quita los avisos pendientes y programa los del plan actual.
+    /// Se avisa cuando una misión se marca fuera de la app (notificación o widget), para que la app se refresque.
+    static let cambioFuera = Notification.Name("CaballoBlanco.cambioFuera")
+
+    /// Programa los avisos del plan actual de este juego.
     static func reprogramar(_ juego: Juego) async {
+        await reprogramar(juego.avisos())
+    }
+
+    /// Primero añade los avisos del plan (el mismo id sustituye al anterior) y después quita los pendientes
+    /// que ya no están en él: si iOS cierra el proceso a medias, no se queda sin avisos.
+    /// Sin permiso, el plan no se programa y se quitan todos.
+    static func reprogramar(_ plan: [AvisoPlan]) async {
         let centro = UNUserNotificationCenter.current()
-        let viejos = await centro.pendingNotificationRequests().map(\.identifier).filter { $0.hasPrefix(prefijo) }
-        centro.removePendingNotificationRequests(withIdentifiers: viejos)
+        var puestos: Set<String> = []
 
         switch await centro.notificationSettings().authorizationStatus {
-        case .authorized, .provisional, .ephemeral: break
-        default: return
+        case .authorized, .provisional, .ephemeral:
+            for aviso in plan {
+                guard let cuando = componentes(aviso.fecha) else { continue }
+                let contenido = UNMutableNotificationContent()
+                contenido.title = aviso.titulo
+                contenido.body = aviso.cuerpo
+                contenido.sound = .default
+                contenido.categoryIdentifier = aviso.tipo == "racha" ? categoriaRacha : categoria
+                if let m = aviso.misionId { contenido.userInfo = ["misionId": m] }
+                let disparo = UNCalendarNotificationTrigger(dateMatching: cuando, repeats: false)
+                let id = aviso.id.hasPrefix(prefijo) ? aviso.id : prefijo + aviso.id
+                do {
+                    try await centro.add(UNNotificationRequest(identifier: id, content: contenido, trigger: disparo))
+                    puestos.insert(id)
+                } catch {}
+            }
+        default: break
         }
 
-        // Se lee después de quitar los pendientes, para no volver a poner avisos viejos.
-        for aviso in juego.avisos() {
-            guard let cuando = componentes(aviso.fecha) else { continue }
-            let contenido = UNMutableNotificationContent()
-            contenido.title = aviso.titulo
-            contenido.body = aviso.cuerpo
-            contenido.sound = .default
-            contenido.categoryIdentifier = aviso.tipo == "racha" ? categoriaRacha : categoria
-            if let m = aviso.misionId { contenido.userInfo = ["misionId": m] }
-            let disparo = UNCalendarNotificationTrigger(dateMatching: cuando, repeats: false)
-            let id = aviso.id.hasPrefix(prefijo) ? aviso.id : prefijo + aviso.id
-            try? await centro.add(UNNotificationRequest(identifier: id, content: contenido, trigger: disparo))
-        }
+        let sobran = await centro.pendingNotificationRequests().map(\.identifier)
+            .filter { $0.hasPrefix(prefijo) && !puestos.contains($0) }
+        centro.removePendingNotificationRequests(withIdentifiers: sobran)
     }
 
     /// "YYYY-MM-DDTHH:MM" en hora local → componentes; nil si no se entiende.

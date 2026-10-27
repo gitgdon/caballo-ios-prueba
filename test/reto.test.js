@@ -61,6 +61,17 @@ test('al llegar a la meta: cumplido, medalla oculta y logro, una sola vez', () =
   assert.strictEqual(retoInfo(s2, NOW).progreso, 1);
 });
 
+test('el último día aún cuenta; pasado el plazo la meta no da reto cumplido', () => {
+  const s0 = conReto();
+  const ultimo = apuntarFacturacion(s0, 10000, at('2026-12-31'));
+  assert.strictEqual(ultimo.reto.cumplido, true);
+  const tarde = apuntarFacturacion(s0, 10000, at('2027-01-01'));
+  assert.strictEqual(tarde.reto.cumplido, false);
+  assert.strictEqual(tarde.reto.facturado, 10000);
+  assert.deepStrictEqual(tarde.secretas, []);
+  assert.ok(!achievements(s0, tarde).includes('🎯 ¡Reto cumplido!'));
+});
+
 test('editarReto mantiene inicio y base; nuevoReto los reinicia', () => {
   let s = createProduct(newState(), { name: 'A', place: 'casa' });
   s.products[0].videos = 2;

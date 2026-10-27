@@ -19,6 +19,7 @@ struct HechoIntent: LiveActivityIntent {
     func perform() async throws -> some IntentResult {
         let juego = Juego()
         juego.accion("hecho", [misionId])
+        NotificationCenter.default.post(name: Avisos.cambioFuera, object: nil)
         WidgetCenter.shared.reloadAllTimelines()
         await Actividad.actualizar(juego.vista())
         await Avisos.reprogramar(juego)

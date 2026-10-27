@@ -585,7 +585,8 @@ function apuntarFacturacion(state, total, now) {
   s.ultimoTotal = t;
   // El reto cuenta solo lo facturado desde que empezó.
   s.reto.facturado = Math.max(0, t - (enteroValido(s.reto.baseFacturacion) || 0));
-  if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
+  // Solo cuenta como cumplido dentro del plazo (el día de fin incluido).
+  if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta && dayKey(now) <= s.reto.fin) {
     s.reto.cumplido = true;
     ganarSecreta(s, 'reto-cumplido');
   }

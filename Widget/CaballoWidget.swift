@@ -17,10 +17,11 @@ struct Proveedor: TimelineProvider {
         let ahora = Date.now
         let mediaHora = ahora.addingTimeInterval(30 * 60)
         let manana = Calendar.current.startOfDay(for: ahora.addingTimeInterval(24 * 3600)).addingTimeInterval(60)
-        let entrada = Entrada(date: ahora, vista: Juego().preparar())
+        let juego = Juego()
+        let entrada = Entrada(date: ahora, vista: juego.preparar())
         completion(Timeline(entries: [entrada], policy: .after(min(mediaHora, manana))))
         // Lo mejor posible: iOS puede cerrar la extensión antes de que termine.
-        Task { await Avisos.reprogramar(Juego()) }
+        Task { await Avisos.reprogramar(juego) }
     }
 }
 
@@ -248,7 +249,9 @@ struct RetoRectangular: View {
 
     var body: some View {
         let dias = max(r.diasQuedan, 0)
-        let textoDias = "\(dias) \(dias == 1 ? "día" : "días")"
+        let ultimoDia = r.diasQuedan == 0 && !r.vencido
+        let textoDias = ultimoDia ? "Último día" : "\(dias) \(dias == 1 ? "día" : "días")"
+        let plazo = ultimoDia ? "último día" : "quedan \(textoDias)"
         let textoVideos = "\(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")"
         VStack(alignment: .leading, spacing: 2) {
             Text("\(titulo) · \(textoDias)").font(.headline).lineLimit(1)
@@ -257,7 +260,7 @@ struct RetoRectangular: View {
                 .font(.caption).lineLimit(1).minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(titulo): \(miles(r.facturado)) euros de \(miles(r.meta)), quedan \(textoDias), \(textoVideos)")
+        .accessibilityLabel("\(titulo): \(miles(r.facturado)) euros de \(miles(r.meta)), \(plazo), \(textoVideos)")
     }
 }
 

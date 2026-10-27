@@ -416,6 +416,8 @@ private struct FilaHistorias: View {
             plazo = "🏆 Reto cumplido"
         } else if r.vencido {
             plazo = "El plazo acabó el \(Self.diaCorto(r.fin)). Puedes empezar otro en Más"
+        } else if r.diasQuedan == 0 {
+            plazo = "Último día"
         } else if r.diasQuedan == 1 {
             plazo = "Queda 1 día hasta el \(Self.diaCorto(r.fin))"
         } else {

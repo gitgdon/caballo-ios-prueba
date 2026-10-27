@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 import UserNotifications
@@ -30,6 +31,7 @@ final class DelegadoAvisos: NSObject, UNUserNotificationCenterDelegate {
         let misionId = response.notification.request.content.userInfo["misionId"] as? String
         let juego = Juego()
         juego.accion("hechoAviso", [misionId ?? ""])
+        NotificationCenter.default.post(name: Avisos.cambioFuera, object: nil)
         WidgetCenter.shared.reloadAllTimelines()
         await Actividad.actualizar(juego.vista())
         await Avisos.reprogramar(juego)
@@ -62,7 +64,14 @@ final class Modelo: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         let v = vista
         Task { await Actividad.actualizar(v) }
-        Task { await Avisos.reprogramar(Juego()) }
+        // El plan se lee aquí, en el hilo principal: el JSContext de `juego` no se comparte entre tareas.
+        let plan = juego.avisos()
+        Task { await Avisos.reprogramar(plan) }
+    }
+
+    /// Plan de avisos de hoy y mañana.
+    func planAvisos() -> [AvisoPlan] {
+        juego.avisos()
     }
 
     func hacer(_ nombre: String, _ args: [String] = []) {
@@ -120,9 +129,13 @@ struct Raiz: View {
         .onAppear { modelo.refrescar() }
         .task {
             await Avisos.pedirPermisoSiHaceFalta()
-            await Avisos.reprogramar(Juego())
+            await Avisos.reprogramar(modelo.planAvisos())
         }
         .onChange(of: fase) { _, nueva in if nueva == .active { modelo.refrescar() } }
+        // "Hecho" desde la notificación o el widget con la app abierta.
+        .onReceive(NotificationCenter.default.publisher(for: Avisos.cambioFuera).receive(on: DispatchQueue.main)) { _ in
+            modelo.refrescar()
+        }
         .sheet(isPresented: $hojaNuevo) {
             ScrollView {
                 HojaNuevoProducto(modelo: modelo) { nombre, lugar, copia in
