@@ -66,6 +66,7 @@ function newState() {
     usedQuotes: [],
     secretas: [],
     tecnicasVistas: 0,
+    ganchos: [],
   };
 }
 
@@ -81,6 +82,7 @@ function normalizeState(s) {
   s.usedQuotes = s.usedQuotes || d.usedQuotes;
   s.secretas = s.secretas || d.secretas;
   if (s.tecnicasVistas === undefined) s.tecnicasVistas = d.tecnicasVistas;
+  s.ganchos = s.ganchos || d.ganchos;
   s.today = Object.assign(d.today, s.today);
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
@@ -88,6 +90,9 @@ function normalizeState(s) {
     if (p.winners === undefined) p.winners = 0;
     if (p.bajonAvisado === undefined) p.bajonAvisado = false;
     if (p.tecnicasPracticadas === undefined) p.tecnicasPracticadas = [];
+    if (p.copia === undefined) p.copia = null;
+    if (p.visitas === undefined) p.visitas = [];
+    if (p.siguienteCambio === undefined) p.siguienteCambio = null;
   }
   return s;
 }
@@ -130,11 +135,16 @@ const SECRETAS = {
   'reto-cumplido': 'Reto cumplido',
 };
 
+const RETO_META = 10000;
+const RETO_FIN = '2026-12-31';
+const GANCHO_PREFIJO = '· reutiliza tu gancho «';
+const GANCHO_MAX = 60;
+
 function clone(x) {
   return JSON.parse(JSON.stringify(x));
 }
 
-function createProduct(state, { name, place }) {
+function createProduct(state, { name, place, copia }) {
   const s = clone(state);
   s.productsStarted += 1;
   s.products.push({
@@ -152,6 +162,9 @@ function createProduct(state, { name, place }) {
     winners: 0,
     bajonAvisado: false,
     tecnicasPracticadas: [],
+    copia: copia === true || copia === false ? copia : null,
+    visitas: [],
+    siguienteCambio: null,
   });
   return s;
 }
@@ -166,6 +179,7 @@ function rollDay(state, now) {
   const s = clone(state);
   const day = dayKey(now);
   if (s.today.day !== day) s.today = { day, done: [], skipped: false, videos: 0, recordNotified: false, minimo: false };
+  if (!s.reto) s.reto = { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false };
   for (const p of s.products) {
     if (p.status === 'test' && testDay(p, day) > 14) p.status = 'decision';
   }
@@ -250,10 +264,24 @@ function missionsForDay(state, now, extra) {
     list.sort((a, b) => BLOCKS.indexOf(a.block) - BLOCKS.indexOf(b.block));
     out.push(...list);
   }
+  for (const p of state.products) {
+    if (!p.siguienteCambio) continue;
+    const v = out.find((x) => x.productId === p.id && x.id.split(':')[1] === 'video' && !doneToday.includes(x.id));
+    if (v) {
+      v.text += ' ' + p.siguienteCambio;
+      v.cambio = true;
+    }
+  }
   const tecs = extra && extra.tecnicas ? tecnicasDesbloqueadas(state, extra.tecnicas) : [];
   const hTec = hashDay(day + ':tec');
   const firstVideo = out.find((x) => x.id.split(':')[1] === 'video' && !doneToday.includes(x.id));
-  if (tecs.length && hTec % 2 === 0 && firstVideo) {
+  const hGancho = hashDay(day + ':gancho');
+  const ganchos = state.ganchos || [];
+  if (firstVideo && !firstVideo.cambio && ganchos.length && hGancho % 4 === 0) {
+    const g = ganchos[Math.floor(hGancho / 4) % ganchos.length];
+    const room = GANCHO_MAX - Array.from(GANCHO_PREFIJO).length - 1;
+    firstVideo.text += ' ' + GANCHO_PREFIJO + Array.from(g.texto).slice(0, room).join('') + '»';
+  } else if (tecs.length && hTec % 2 === 0 && firstVideo && !firstVideo.cambio) {
     const t = tecs[Math.floor(hTec / 2) % tecs.length];
     firstVideo.text += ' ' + t.variante;
     firstVideo.tecnica = t.id;
@@ -321,6 +349,7 @@ function completeMission(state, missionId, now, extra) {
   if (mission.kind === 'minimo' || mission.kind === 'ensayo') return s;
   if (mission.kind === 'video' || (mission.kind === 'raro' && mission.video)) countVideo(s, p);
   if (mission.id === p.id + ':primer:2') s.today.done.push(p.id + ':video:1');
+  if (mission.cambio && p) p.siguienteCambio = null;
   if (mission.tecnica && !p.tecnicasPracticadas.includes(mission.tecnica)) p.tecnicasPracticadas.push(mission.tecnica);
   if (mission.kind === 'cuenta') {
     p.accounts[mission.id.split(':')[2]] = true;
@@ -483,6 +512,7 @@ function achievements(before, after) {
   for (const id of after.secretas || []) {
     if (!(before.secretas || []).includes(id)) out.push('🏅 Medalla oculta: ' + SECRETAS[id]);
   }
+  if (after.reto && after.reto.cumplido && !(before.reto && before.reto.cumplido)) out.push('🎯 ¡Reto cumplido!');
   if (after.shields > before.shields) out.push('🛡️ Escudo ganado (tienes ' + after.shields + ')');
   const b = levelInfo(before.xp);
   const a = levelInfo(after.xp);
@@ -493,6 +523,104 @@ function achievements(before, after) {
 function checkpointText(state) {
   const n = state.productsStarted + 1;
   return '🏁 Checkpoint guardado. Producto ' + n + (n > 30 ? '' : '/30') + ' desbloqueado';
+}
+
+function retoInfo(state, now) {
+  const r = state.reto;
+  const hoy = dayKey(now);
+  return {
+    meta: r.meta,
+    fin: r.fin,
+    facturado: r.facturado,
+    progreso: Math.min(1, r.facturado / r.meta),
+    diasQuedan: Math.max(0, daysBetween(hoy, r.fin)),
+    vencido: hoy > r.fin,
+    videos: totalVideos(state) - r.base,
+    cumplido: r.cumplido,
+  };
+}
+
+function apuntarFacturacion(state, total, now) {
+  const s = clone(state);
+  if (typeof total !== 'number' || !Number.isFinite(total) || total < 0) return s;
+  s.reto.facturado = Math.round(total);
+  if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
+    s.reto.cumplido = true;
+    ganarSecreta(s, 'reto-cumplido');
+  }
+  return s;
+}
+
+function editarReto(state, meta, fin) {
+  const s = clone(state);
+  s.reto.meta = meta;
+  s.reto.fin = fin;
+  return s;
+}
+
+function nuevoReto(state, meta, fin, now) {
+  const s = clone(state);
+  s.reto = { meta, fin, inicio: dayKey(now), base: totalVideos(s), facturado: 0, cumplido: false };
+  return s;
+}
+
+function avisoCopia(porQue, pidenEnlace, margen) {
+  if (porQue === true && pidenEnlace === true && margen === true) return null;
+  const faltan = [];
+  if (porQue !== true) faltan.push('saber por qué funcionó');
+  if (pidenEnlace !== true) faltan.push('que la gente pida el enlace');
+  if (margen !== true) faltan.push('tener margen');
+  return 'Ojo, sin ' + faltan.join(', ') + ' es más difícil que funcione. Puedes probarlo igual: los 14 días de test son la prueba.';
+}
+
+const FASES = [
+  { min: 0, fase: 'arranque', donde: 'No arranca', cambio: 'originalidad, luz, lente limpia, clips propios', variante: '· cambia la luz y usa clips propios' },
+  { min: 100, fase: 'palabras', donde: 'Te encuentran poco', cambio: 'palabras clave del producto en el texto y los hashtags', variante: '· pon el producto en texto y hashtags' },
+  { min: 250, fase: 'gancho', donde: 'Segundos 0–2', cambio: 'el gancho', variante: '· cambia solo el gancho' },
+  { min: 2000, fase: 'ritmo', donde: 'Segundos 2–5', cambio: 'algo nuevo cada 2 s', variante: '· algo nuevo cada 2 segundos' },
+  { min: 5000, fase: 'cierre', donde: 'El cierre', cambio: 'el final', variante: '· cambia solo el final' },
+  { min: 10000, fase: 'interaccion', donde: 'Interacción', cambio: 'una pregunta o sorpresa al final', variante: '· cierra con una pregunta o sorpresa' },
+];
+
+function faseDeVisitas(n) {
+  let f = FASES[0];
+  for (const x of FASES) if (n >= x.min) f = x;
+  return { fase: f.fase, donde: f.donde, cambio: f.cambio, variante: f.variante };
+}
+
+function apuntarVisitas(state, productId, n, now) {
+  const s = clone(state);
+  const p = findProduct(s, productId);
+  if (!p || typeof n !== 'number' || !Number.isFinite(n) || n < 0) return s;
+  const f = faseDeVisitas(n);
+  p.visitas.push({ dia: dayKey(now), visitas: n, fase: f.fase });
+  p.siguienteCambio = f.variante;
+  return s;
+}
+
+function pideGancho(n) {
+  return n >= 5000;
+}
+
+function guardarGancho(state, productId, texto, n, now) {
+  const s = clone(state);
+  const t = Array.from(String(texto == null ? '' : texto).trim()).slice(0, 80).join('');
+  if (!t) return s;
+  s.ganchos.push({ texto: t, producto: productId, visitas: n, dia: dayKey(now) });
+  return s;
+}
+
+function recomendacionDia14(puedeDiferente, sabesPorQue, ideasNuevas) {
+  return puedeDiferente === true && sabesPorQue === true && ideasNuevas === true ? 'seguir' : 'soltar';
+}
+
+function resumenDescarte(state, productId) {
+  const p = findProduct(state, productId);
+  const v = p.videos;
+  const t = p.tecnicasPracticadas.length;
+  const k = (state.ganchos || []).filter((g) => g.producto === productId).length;
+  return 'Te llevas: ' + v + (v === 1 ? ' vídeo' : ' vídeos') + ' · ' + t + (t === 1 ? ' técnica practicada' : ' técnicas practicadas') +
+    ' · ' + k + (k === 1 ? ' gancho guardado' : ' ganchos guardados');
 }
 
 function hashDay(day) {
@@ -564,5 +692,7 @@ if (typeof module !== 'undefined') {
     markBajonAvisado, bajonText, inBajon, skipEffect,
     hashDay, totalVideos, primerVideoActivo, tecnicasDesbloqueadas, marcarTecnicasVistas, SECRETAS,
     PRIMER_ENSAYO_TEXT, PRIMER_PUBLICA_TEXT,
+    RETO_META, RETO_FIN, retoInfo, apuntarFacturacion, editarReto, nuevoReto, avisoCopia,
+    FASES, faseDeVisitas, apuntarVisitas, pideGancho, guardarGancho, recomendacionDia14, resumenDescarte,
   };
 }
