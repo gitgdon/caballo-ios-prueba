@@ -40,7 +40,7 @@ struct Hoy: View {
                 .foregroundStyle(Tema.texto)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
-            Caballo(humor: v.humor, lado: 34)
+            Caballo(humor: v.humor, lado: 34, rango: v.rango)
         }
         .padding(.horizontal, Espacio.l)
         .padding(.top, Espacio.s)
@@ -312,7 +312,7 @@ private struct FilaHistorias: View {
         return Historia(titulo: "Nivel \(vista.nivel)",
                         etiqueta: "Nivel \(vista.nivel), \(vista.rango): \(vista.xp) de \(vista.xpSig) XP",
                         progreso: progreso, color: Tema.Anillo.xp, nueva: nueva(.nivel),
-                        contenido: { Caballo(humor: vista.humor, lado: 50) },
+                        contenido: { Caballo(humor: vista.humor, lado: 50, rango: vista.rango) },
                         accion: { abrir(.nivel) })
     }
 

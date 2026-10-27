@@ -215,6 +215,7 @@ struct VistaWidget: View {
 struct CaballoWidgets: WidgetBundle {
     var body: some Widget {
         CaballoWidget()
+        CaballoReto()
         CaballoActividad()
     }
 }
@@ -227,5 +228,51 @@ struct CaballoWidget: Widget {
         .configurationDisplayName("Caballo Blanco")
         .description("Tu caballo, tu misión de hoy y tu racha")
         .supportedFamilies([.systemSmall, .systemMedium, .accessoryCircular, .accessoryRectangular, .accessoryInline])
+    }
+}
+
+private func metaCorta(_ meta: Int) -> String {
+    meta % 1000 == 0 ? "\(meta / 1000)k" : euros(meta)
+}
+
+/// Pareja del rectangular de Hoy en la pantalla de bloqueo: cuánto llevas del reto.
+struct RetoRectangular: View {
+    let r: Reto
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text("Reto Q4 · \(r.diasQuedan) \(r.diasQuedan == 1 ? "día" : "días")").font(.headline).lineLimit(1)
+            ProgressView(value: min(max(r.progreso, 0), 1)).progressViewStyle(.linear)
+            Text("\(euros(r.facturado)) de \(metaCorta(r.meta)) · \(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")")
+                .font(.caption).lineLimit(1).minimumScaleFactor(0.7)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Reto: \(miles(r.facturado)) euros de \(miles(r.meta)), quedan \(r.diasQuedan) \(r.diasQuedan == 1 ? "día" : "días"), \(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")")
+    }
+}
+
+struct VistaReto: View {
+    let entrada: Entrada
+
+    var body: some View {
+        Group {
+            if let r = entrada.vista?.reto {
+                RetoRectangular(r: r)
+            } else {
+                Text("Abre Caballo Blanco")
+            }
+        }
+        .containerBackground(for: .widget) { Color.clear }
+    }
+}
+
+struct CaballoReto: Widget {
+    var body: some WidgetConfiguration {
+        StaticConfiguration(kind: "CaballoReto", provider: Proveedor()) { entrada in
+            VistaReto(entrada: entrada)
+        }
+        .configurationDisplayName("Reto")
+        .description("Lo que llevas facturado del reto, los días que quedan y tus vídeos")
+        .supportedFamilies([.accessoryRectangular])
     }
 }

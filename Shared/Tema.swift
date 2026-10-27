@@ -35,6 +35,17 @@ enum Tema {
         static let reto = dinamico(0xB07A10, 0xF2C14E)
     }
 
+    /// Borde del círculo del caballo por rango (tokens rango-*). Jinete novato no lleva borde.
+    enum Rango {
+        static let novato = Color.clear
+        static let jinete = dinamico(0x8A7F70, 0x8C8173)
+        static let explorador = dinamico(0x357F6C, 0x4FA38E)
+        static let forajido = dinamico(0xCF4F22, 0xE8673A)
+        static let leyenda = dinamico(0xA86F15, 0xE3A84A)
+        /// Halo de Leyenda (brand-dorado), decorativo.
+        static let halo = Color(hex(0xE3A84A))
+    }
+
     /// Colores fijos (tokens oscuros) para la tarjeta de la pantalla de bloqueo, que siempre es oscura.
     enum Bloqueo {
         static let dorado = Color(hex(0xE3A84A))
