@@ -66,7 +66,14 @@ final class Modelo: ObservableObject {
     }
 
     func hacer(_ nombre: String, _ args: [String] = []) {
-        if let r = juego.accion(nombre, args) {
+        hacerConResultado(nombre, args)
+    }
+
+    /// Como `hacer`, pero devuelve el resultado (la fase y el gancho de "visitas").
+    @discardableResult
+    func hacerConResultado(_ nombre: String, _ args: [String] = []) -> Resultado? {
+        let r = juego.accion(nombre, args)
+        if let r {
             var mensajes = r.logros
             if let g = r.ganador { mensajes.insert(g, at: 0) }
             if let c = r.checkpoint { mensajes.insert(c, at: 0) }
@@ -74,6 +81,17 @@ final class Modelo: ObservableObject {
         }
         vista = juego.vista()
         actualizarFuera()
+        return r
+    }
+
+    /// Aviso amable para una copia a la que le falta alguna comprobación; nil si las cumple.
+    func avisoCopia(_ porQue: Bool, _ pidenEnlace: Bool, _ margen: Bool) -> String? {
+        juego.avisoCopia(porQue, pidenEnlace, margen)
+    }
+
+    /// "seguir" o "soltar" según las tres preguntas del día 14.
+    func recomendacion(_ diferente: Bool, _ sabesPorQue: Bool, _ ideas: Bool) -> String {
+        juego.recomendacion(diferente, sabesPorQue, ideas)
     }
 }
 
@@ -101,12 +119,14 @@ struct Raiz: View {
         }
         .onChange(of: fase) { _, nueva in if nueva == .active { modelo.refrescar() } }
         .sheet(isPresented: $hojaNuevo) {
-            HojaNuevoProducto { nombre, lugar in
-                modelo.hacer("nuevo", [nombre, lugar])
-                hojaNuevo = false
+            ScrollView {
+                HojaNuevoProducto(modelo: modelo) { nombre, lugar, copia in
+                    modelo.hacer("nuevo", [nombre, lugar, copia])
+                    hojaNuevo = false
+                }
+                .padding(Espacio.l)
             }
-            .padding(Espacio.l)
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
             .presentationBackground(Tema.fondo)
             .avisoLogro(texto: $modelo.aviso)
         }

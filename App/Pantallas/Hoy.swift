@@ -5,6 +5,7 @@ struct Hoy: View {
     @ObservedObject var modelo: Modelo
     @Binding var hojaNuevo: Bool
     @State private var hojaSaltar = false
+    @State private var visitasPara: Vista.Ref?
 
     var body: some View {
         ScrollView {
@@ -20,6 +21,12 @@ struct Hoy: View {
         .background(Tema.fondo)
         .sheet(isPresented: $hojaSaltar) {
             HojaSaltar(modelo: modelo)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Tema.fondo)
+                .avisoLogro(texto: $modelo.aviso)
+        }
+        .sheet(item: $visitasPara) { p in
+            HojaVisitas(producto: p, modelo: modelo)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Tema.fondo)
                 .avisoLogro(texto: $modelo.aviso)
@@ -41,7 +48,7 @@ struct Hoy: View {
 
     @ViewBuilder private func contenido(_ v: Vista) -> some View {
         if !v.hayProductos {
-            Tarjeta { HojaNuevoProducto { nombre, lugar in modelo.hacer("nuevo", [nombre, lugar]) } }
+            Tarjeta { HojaNuevoProducto(modelo: modelo) { nombre, lugar, copia in modelo.hacer("nuevo", [nombre, lugar, copia]) } }
                 .padding(.horizontal, Espacio.l)
         } else if let d = v.decisiones.first {
             HojaDecision(producto: d, modelo: modelo, hojaNuevo: $hojaNuevo)
@@ -70,8 +77,21 @@ struct Hoy: View {
                     }
                 }
             }
+            ForEach(productosMetricas(v)) { p in
+                Button("📈 Apuntar visitas de \(p.nombre)") { visitasPara = p }
+                    .buttonStyle(.secundario)
+                    .accessibilityLabel("Apuntar visitas de \(p.nombre)")
+            }
         }
         .padding(.horizontal, Espacio.l)
+    }
+
+    /// Productos con la misión de métricas pendiente: su id es "<producto>:metricas".
+    private func productosMetricas(_ v: Vista) -> [Vista.Ref] {
+        v.pendientes.filter { $0.tipo == "metricas" }.compactMap { m in
+            let pid = String(m.id.dropLast(":metricas".count))
+            return v.productos.first { $0.id == pid }.map { Vista.Ref(id: $0.id, nombre: $0.nombre) }
+        }
     }
 
     private func acciones(_ v: Vista) -> some View {

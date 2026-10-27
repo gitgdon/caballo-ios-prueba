@@ -5,6 +5,7 @@ struct Productos: View {
     @ObservedObject var modelo: Modelo
     @Binding var hojaNuevo: Bool
     @State private var productoPara: Vista.ProductoFila?
+    @State private var visitasPara: Vista.Ref?
 
     var body: some View {
         NavigationStack {
@@ -12,6 +13,12 @@ struct Productos: View {
                 .scrollContentBackground(.hidden)
                 .background(Tema.fondo)
                 .navigationTitle("Productos")
+        }
+        .sheet(item: $visitasPara) { p in
+            HojaVisitas(producto: p, modelo: modelo)
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Tema.fondo)
+                .avisoLogro(texto: $modelo.aviso)
         }
     }
 
@@ -46,6 +53,11 @@ struct Productos: View {
                 .accessibilityLabel("10k en YouTube Shorts")
             Button("💰 He vendido") { ejecutar("vendido") }
                 .accessibilityLabel("He vendido")
+            Button("📈 Apuntar visitas") {
+                if let p = productoPara { visitasPara = Vista.Ref(id: p.id, nombre: p.nombre) }
+                productoPara = nil
+            }
+            .accessibilityLabel("Apuntar visitas")
         }
     }
 
@@ -65,7 +77,7 @@ struct Productos: View {
     private func fila(_ p: Vista.ProductoFila, vendible: Bool) -> some View {
         if vendible {
             Button { productoPara = p } label: { FilaProducto(producto: p) }
-                .accessibilityHint("Toca para apuntar un vídeo ganador, un 10k o una venta")
+                .accessibilityHint("Toca para apuntar un vídeo ganador, un 10k, una venta o visitas")
         } else {
             FilaProducto(producto: p)
         }

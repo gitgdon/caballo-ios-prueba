@@ -7,13 +7,32 @@ struct HojaDecision: View {
     @Binding var hojaNuevo: Bool
     @State private var vendio = false
     @State private var poco = false
+    /// Respuestas a las tres preguntas de revisión (nil sin contestar).
+    @State private var respuestas: [Bool?] = [nil, nil, nil]
+    @State private var revisado = false
+
+    private static let preguntas = ["¿Puedes hacerlo diferente?", "¿Sabes por qué no vende?", "¿Tienes ideas nuevas?"]
+
+    /// Las preguntas solo salen si el producto tuvo visitas y no se marcó como vendido.
+    private var conRevision: Bool {
+        guard let fila = modelo.vista?.productos.first(where: { $0.id == producto.id }) else { return false }
+        return fila.visitasMax > 0 && !fila.vendido
+    }
+
+    /// "seguir" o "soltar" cuando las tres están contestadas.
+    private var recomendacion: String? {
+        guard respuestas.allSatisfy({ $0 != nil }) else { return nil }
+        return modelo.recomendacion(respuestas[0] == true, respuestas[1] == true, respuestas[2] == true)
+    }
 
     var body: some View {
         Tarjeta {
             Text("DECISIÓN")
                 .font(.caption.bold())
                 .foregroundStyle(Tema.textoSuave)
-            if !vendio {
+            if conRevision && !revisado && !vendio {
+                pasoRevision
+            } else if !vendio {
                 pasoVendio
             } else if !poco {
                 pasoCuanto
@@ -76,5 +95,48 @@ struct HojaDecision: View {
                 .buttonStyle(.secundario)
                 .accessibilityLabel("Dejarlo")
         }
+    }
+
+    private var pasoRevision: some View {
+        VStack(alignment: .leading, spacing: Espacio.m) {
+            pregunta("Antes de decidir sobre \(producto.nombre)")
+            ForEach(0..<3, id: \.self) { i in
+                PreguntaSiNo(texto: Self.preguntas[i], respuesta: $respuestas[i])
+            }
+            if let r = recomendacion {
+                Text(r == "seguir" ? "Te recomendamos seguir" : "Te recomendamos soltarlo")
+                    .font(.headline)
+                    .foregroundStyle(Tema.texto)
+                Button("Continuar") { revisado = true }
+                    .buttonStyle(.principal)
+                    .accessibilityLabel("Continuar a la decisión")
+            }
+        }
+    }
+}
+
+/// Una pregunta con Sí / No; la respuesta elegida va resaltada.
+private struct PreguntaSiNo: View {
+    let texto: String
+    @Binding var respuesta: Bool?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Espacio.s) {
+            Text(texto)
+                .font(.body)
+                .foregroundStyle(Tema.texto)
+            HStack(spacing: Espacio.s) {
+                opcion("Sí", true)
+                opcion("No", false)
+            }
+        }
+    }
+
+    @ViewBuilder private func opcion(_ titulo: String, _ valor: Bool) -> some View {
+        let elegida = respuesta == valor
+        Button(titulo) { respuesta = valor }
+            .buttonStyle(elegida ? EstiloBoton(variante: .principal) : EstiloBoton(variante: .secundario))
+            .accessibilityLabel("\(texto) \(titulo)")
+            .accessibilityAddTraits(elegida ? .isSelected : [])
     }
 }
