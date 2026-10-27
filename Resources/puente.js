@@ -74,6 +74,7 @@ function vista(json) {
       r.progreso = Number.isFinite(r.progreso) ? Math.max(0, Math.min(1, r.progreso)) : 0;
       return r;
     })(retoInfo(s, now)),
+    ultimoTotal: enteroPuente(s.ultimoTotal),
     tecnicas: TECNICAS.slice().sort(function (a, b) { return a.nivel - b.nivel; }).map(function (t) {
       var abierta = t.nivel <= info.level;
       return { id: t.id, nivel: enteroPuente(t.nivel), titulo: t.titulo, texto: abierta ? t.texto : '', mision: abierta ? t.mision : '', desbloqueada: abierta };

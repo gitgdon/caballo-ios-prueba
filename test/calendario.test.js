@@ -152,3 +152,62 @@ test('puente: gasto, borrarMovimiento y calendario', () => {
   assert.strictEqual(d.neto, 1240);
   assert.strictEqual(ctx.calendario(json, 'malo'), 'null');
 });
+
+// Ruling (a): un reto nuevo no vuelve a contar lo ya facturado.
+const { nuevoReto } = require('../Resources/core.js');
+
+test('total 5000, reto nuevo y total 5200: ingreso +200 y facturado 200', () => {
+  let s = apuntarFacturacion(base(), 5000, at('2026-10-20'));
+  s = nuevoReto(s, 10000, '2027-01-31', at('2026-10-21'));
+  assert.strictEqual(s.reto.baseFacturacion, 5000);
+  s = apuntarFacturacion(s, 5200, at('2026-10-22'));
+  const cal = calendarioMes(s, '2026-10');
+  assert.strictEqual(dia(cal, '2026-10-22').ingresos, 200);
+  assert.strictEqual(dia(cal, '2026-10-20').ingresos, 5000);
+  assert.strictEqual(s.movimientos.length, 2);
+  assert.strictEqual(s.reto.facturado, 200);
+  assert.strictEqual(s.ultimoTotal, 5200);
+});
+
+test('tras un reto nuevo, corregir por debajo de la base: ingreso −400 y facturado 0', () => {
+  let s = apuntarFacturacion(base(), 5000, at('2026-10-20'));
+  s = nuevoReto(s, 10000, '2027-01-31', at('2026-10-21'));
+  s = apuntarFacturacion(s, 5200, at('2026-10-22'));
+  const cumplido = s.reto.cumplido;
+  s = apuntarFacturacion(s, 4800, at('2026-10-23'));
+  assert.strictEqual(dia(calendarioMes(s, '2026-10'), '2026-10-23').ingresos, -400);
+  assert.strictEqual(s.reto.facturado, 0);
+  assert.strictEqual(s.reto.cumplido, cumplido);
+});
+
+test('migración: reto.facturado 2500 sin ultimoTotal da ultimoTotal 2500 y base 0; idempotente', () => {
+  const viejo = rollDay(newState(), at('2026-10-01'));
+  viejo.reto.facturado = 2500;
+  delete viejo.reto.baseFacturacion;
+  delete viejo.ultimoTotal;
+  const s = parseState(JSON.stringify(viejo));
+  assert.strictEqual(s.ultimoTotal, 2500);
+  assert.strictEqual(s.reto.baseFacturacion, 0);
+  assert.deepStrictEqual(parseState(JSON.stringify(s)), s);
+  const n = apuntarFacturacion(s, 2600, at('2026-10-27'));
+  assert.strictEqual(n.movimientos[n.movimientos.length - 1].importe, 100);
+  assert.strictEqual(n.reto.facturado, 2600);
+});
+
+test('estado roto: reto.facturado 1e30 da ultimoTotal 0', () => {
+  const viejo = rollDay(newState(), at('2026-10-01'));
+  viejo.reto.facturado = 1e30;
+  delete viejo.ultimoTotal;
+  assert.strictEqual(parseState(JSON.stringify(viejo)).ultimoTotal, 0);
+});
+
+test('puente: facturacion 2500, retoNuevo, facturacion 2600 → facturado 100 y ultimoTotal 2600', () => {
+  const ctx = contexto(at('2026-10-27', 10));
+  const accion = (json, nombre, args) => JSON.parse(ctx.accion(json, nombre, JSON.stringify(args))).estado;
+  let json = accion(null, 'facturacion', ['2500']);
+  json = accion(json, 'retoNuevo', ['20000', '2027-06-30']);
+  json = accion(json, 'facturacion', ['2600']);
+  const v = JSON.parse(ctx.vista(json));
+  assert.strictEqual(v.reto.facturado, 100);
+  assert.strictEqual(v.ultimoTotal, 2600);
+});

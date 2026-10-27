@@ -1,7 +1,7 @@
 import SwiftUI
 import UserNotifications
 
-/// Pestaña Más: mi porqué, la frase de hoy, técnicas y ganchos, avisos, reto, ajustes y créditos,
+/// Pestaña Más: mi porqué, la frase de hoy, técnicas y ganchos, calendario de dinero, avisos, reto, ajustes y créditos,
 /// al estilo de los Ajustes de iOS.
 struct Mas: View {
     @ObservedObject var modelo: Modelo

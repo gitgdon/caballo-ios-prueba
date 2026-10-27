@@ -21,7 +21,7 @@ test('un estado de la ronda 2 sin reto lo recibe con los valores por defecto', (
   delete viejo.ganchos;
   delete viejo.reto;
   const s = rollDay(parseState(JSON.stringify(viejo)), NOW);
-  assert.deepStrictEqual(s.reto, { meta: 10000, fin: '2026-12-31', inicio: '2026-10-27', base: 0, facturado: 0, cumplido: false });
+  assert.deepStrictEqual(s.reto, { meta: 10000, fin: '2026-12-31', inicio: '2026-10-27', base: 0, facturado: 0, cumplido: false, baseFacturacion: 0 });
   assert.deepStrictEqual(s.ganchos, []);
   assert.strictEqual(retoInfo(s, NOW).diasQuedan, 65);
 });
@@ -73,7 +73,7 @@ test('editarReto mantiene inicio y base; nuevoReto los reinicia', () => {
   assert.strictEqual(e.reto.inicio, '2026-10-27');
   assert.strictEqual(e.reto.facturado, 800);
   const n = nuevoReto(e, 3000, '2027-03-01', at('2027-01-02'));
-  assert.deepStrictEqual(n.reto, { meta: 3000, fin: '2027-03-01', inicio: '2027-01-02', base: 5, facturado: 0, cumplido: false });
+  assert.deepStrictEqual(n.reto, { meta: 3000, fin: '2027-03-01', inicio: '2027-01-02', base: 5, facturado: 0, cumplido: false, baseFacturacion: 800 });
   assert.strictEqual(totalVideos(n), 5);
 });
 

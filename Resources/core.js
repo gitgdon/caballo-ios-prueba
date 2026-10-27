@@ -69,6 +69,7 @@ function newState() {
     ganchos: [],
     avisos: { activos: true, hora: '18:00' },
     movimientos: [],
+    ultimoTotal: 0,
   };
 }
 
@@ -89,6 +90,10 @@ function normalizeState(s) {
   s.avisos.hora = horaValida(s.avisos.hora);
   s.today = Object.assign(d.today, s.today);
   if (!Array.isArray(s.movimientos)) s.movimientos = d.movimientos;
+  // Último total de la tienda apuntado (nunca se reinicia). Un estado anterior lo toma del reto.
+  if (s.ultimoTotal === undefined) s.ultimoTotal = (s.reto && enteroValido(s.reto.facturado)) || 0;
+  s.ultimoTotal = enteroValido(s.ultimoTotal) || 0;
+  if (s.reto && s.reto.baseFacturacion === undefined) s.reto.baseFacturacion = 0;
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
     if (p.videos === undefined) p.videos = 0;
@@ -530,8 +535,13 @@ function checkpointText(state) {
   return '🏁 Checkpoint guardado. Producto ' + n + (n > 30 ? '' : '/30') + ' desbloqueado';
 }
 
+// Total de la tienda cuando empieza un reto: el reto cuenta lo facturado a partir de ahí.
+function baseFacturacionDe(s) {
+  return enteroValido(s.ultimoTotal) || 0;
+}
+
 function retoDe(s, day) {
-  return { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false };
+  return { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false, baseFacturacion: baseFacturacionDe(s) };
 }
 
 // Cantidad entera que Swift puede leer como Int: número finito, ≥ 0 y ≤ MAX_SAFE_INTEGER, redondeado; si no, null.
@@ -565,13 +575,16 @@ function apuntarFacturacion(state, total, now) {
   const t = enteroValido(total);
   if (t === null) return s;
   if (!s.reto) s.reto = retoDe(s, dayKey(now));
-  // El día recibe la diferencia con el total anterior (negativa si se corrige a la baja).
-  const antes = Number.isFinite(s.reto.facturado) ? s.reto.facturado : 0;
+  // El día recibe la diferencia con el último total de la tienda (negativa si se corrige a la baja).
+  const ultimo = enteroValido(s.ultimoTotal);
+  const antes = ultimo !== null ? ultimo : enteroValido(s.reto.facturado) || 0;
   if (t !== antes) {
     if (!Array.isArray(s.movimientos)) s.movimientos = [];
     s.movimientos.push({ dia: dayKey(now), tipo: 'ingreso', importe: t - antes, concepto: 'Facturación' });
   }
-  s.reto.facturado = t;
+  s.ultimoTotal = t;
+  // El reto cuenta solo lo facturado desde que empezó.
+  s.reto.facturado = Math.max(0, t - (enteroValido(s.reto.baseFacturacion) || 0));
   if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
     s.reto.cumplido = true;
     ganarSecreta(s, 'reto-cumplido');
@@ -644,7 +657,7 @@ function editarReto(state, meta, fin) {
 function nuevoReto(state, meta, fin, now) {
   const s = clone(state);
   if (!retoValido(meta, fin)) return s;
-  s.reto = { meta: Math.round(meta), fin, inicio: dayKey(now), base: totalVideos(s), facturado: 0, cumplido: false };
+  s.reto = { meta: Math.round(meta), fin, inicio: dayKey(now), base: totalVideos(s), facturado: 0, cumplido: false, baseFacturacion: baseFacturacionDe(s) };
   return s;
 }
 

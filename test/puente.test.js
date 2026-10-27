@@ -119,7 +119,7 @@ test('facturacion, reto y retoNuevo', () => {
   assert.deepStrictEqual([vista(json).reto.meta, vista(json).reto.fin, vista(json).reto.facturado], [15000, '2027-03-31', 2500]);
   json = accion(json, 'retoNuevo', ['20000', '2027-06-30']).estado;
   assert.deepStrictEqual([vista(json).reto.meta, vista(json).reto.fin, vista(json).reto.facturado], [20000, '2027-06-30', 0]);
-  const r = accion(json, 'facturacion', ['20000']);
+  const r = accion(json, 'facturacion', ['22500']);
   assert.ok(r.logros.includes('🎯 ¡Reto cumplido!'));
   assert.deepStrictEqual(vista(r.estado).secretas, [{ id: 'reto-cumplido', nombre: 'Reto cumplido' }]);
 });

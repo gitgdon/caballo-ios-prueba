@@ -44,12 +44,14 @@ struct Vista: Decodable {
     let reto: Reto?, tecnicas: [Tecnica], tecnicasNuevas: Int
     let secretas: [Secreta], ganchos: [Gancho], avisos: AjustesAvisos
     let primerVideo: Bool, consejo: Consejo?
+    /// Último total de la tienda apuntado (no se reinicia con un reto nuevo).
+    let ultimoTotal: Int
 
     enum CodingKeys: String, CodingKey {
         case nivel, rango, xp, xpSig, racha, escudos, humor, mision, frase, porque, producto
         case hayProductos, pendientes, decisiones, vendibles, puedeMinimo, efectoSaltar, puedeNuevo
         case bajon, textoBajon, porqueGuardado, fraseSaltar, productos, medallas
-        case reto, tecnicas, tecnicasNuevas, secretas, ganchos, avisos, primerVideo, consejo
+        case reto, tecnicas, tecnicasNuevas, secretas, ganchos, avisos, primerVideo, consejo, ultimoTotal
     }
 
     init(from decoder: Decoder) throws {
@@ -86,6 +88,7 @@ struct Vista: Decodable {
         avisos = try c.decodeIfPresent(AjustesAvisos.self, forKey: .avisos) ?? AjustesAvisos(activos: true, hora: "18:00")
         primerVideo = try c.decodeIfPresent(Bool.self, forKey: .primerVideo) ?? false
         consejo = try c.decodeIfPresent(Consejo.self, forKey: .consejo)
+        ultimoTotal = try c.decodeIfPresent(Int.self, forKey: .ultimoTotal) ?? 0
     }
 
     var lineaNivel: String {

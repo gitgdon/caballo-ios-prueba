@@ -170,6 +170,7 @@ private struct CuadriculaMes: View {
 private struct CasillaDia: View {
     let dia: CalendarioMes.Dia
     let accion: () -> Void
+    @Environment(\.dynamicTypeSize) private var tamano
 
     private var numero: String { String(Int(dia.dia.suffix(2)) ?? 0) }
     private var fondo: Color { dia.neto > 0 ? Tema.exito : dia.neto < 0 ? Tema.peligro : Tema.superficie2 }
@@ -186,7 +187,8 @@ private struct CasillaDia: View {
             VStack(spacing: 2) {
                 Text(numero)
                     .font(.caption2)
-                if dia.neto != 0 {
+                // Con letra de accesibilidad el importe no cabe: lo dicen el color y VoiceOver.
+                if dia.neto != 0 && !tamano.isAccessibilitySize {
                     Text(compacto(dia.neto))
                         .font(.caption2.bold())
                         .lineLimit(1)
@@ -209,6 +211,8 @@ private struct HojaDia: View {
     @ObservedObject var modelo: Modelo
     let clave: String
     @Environment(\.dismiss) private var cerrar
+    /// Gasto pendiente de confirmar: solo el diálogo lo borra, así un doble toque no borra dos.
+    @State private var porBorrar: CalendarioMes.Movimiento?
 
     private var dia: CalendarioMes.Dia? {
         modelo.calendario(mes: String(clave.prefix(7)))?.dias.first { $0.dia == clave }
@@ -219,7 +223,7 @@ private struct HojaDia: View {
             List {
                 if let d = dia, !d.movimientos.isEmpty {
                     ForEach(d.movimientos) { m in
-                        FilaMovimiento(movimiento: m) { modelo.hacer("borrarMovimiento", [String(m.indice)]) }
+                        FilaMovimiento(movimiento: m) { porBorrar = m }
                     }
                 } else {
                     Text("Este día no hay movimientos")
@@ -233,6 +237,16 @@ private struct HojaDia: View {
             .background(Tema.fondo)
             .navigationTitle(nombreDia(clave))
             .navigationBarTitleDisplayMode(.inline)
+            .confirmationDialog("¿Borrar este gasto?",
+                                isPresented: Binding(get: { porBorrar != nil }, set: { if !$0 { porBorrar = nil } }),
+                                titleVisibility: .visible,
+                                presenting: porBorrar) { m in
+                Button("Borrar gasto", role: .destructive) {
+                    porBorrar = nil
+                    modelo.hacer("borrarMovimiento", [String(m.indice)])
+                }
+                Button("Cancelar", role: .cancel) { porBorrar = nil }
+            }
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Cerrar") { cerrar() }
@@ -309,7 +323,7 @@ private func enVoz(_ x: Double) -> String {
 private func compacto(_ x: Double) -> String {
     let signo = x > 0 ? "+" : "−"
     let a = min(abs(x), 9e15)
-    guard a >= 1000 else { return signo + (a < 1 ? cantidad(a) : String(Int(a.rounded()))) }
+    guard a.rounded() >= 1000 else { return signo + (a < 1 ? cantidad(a) : String(Int(a.rounded()))) }
     let decimas = Int((a / 100).rounded())
     if decimas >= 1000 || decimas % 10 == 0 { return signo + miles(Int((a / 1000).rounded())) + "k" }
     return signo + "\(decimas / 10),\(decimas % 10)k"

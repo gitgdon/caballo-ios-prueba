@@ -14,7 +14,8 @@ struct HojaFacturacion: View {
 
     private static let maximoConcepto = 40
 
-    private var antes: Int { modelo.vista?.reto?.facturado ?? 0 }
+    /// Último total de la tienda apuntado (no el del reto, que empieza de cero en un reto nuevo).
+    private var antes: Int { modelo.vista?.ultimoTotal ?? 0 }
     /// Hasta el entero más grande que guarda el juego (Number.MAX_SAFE_INTEGER).
     private var valor: Double? { importe(texto).flatMap { $0 <= 9_007_199_254_740_991 ? $0 : nil } }
     /// Gasto mayor que 0 (el juego lo guarda a céntimos).
@@ -83,7 +84,7 @@ struct HojaFacturacion: View {
                 .background(Tema.superficie, in: RoundedRectangle(cornerRadius: Radio.md))
                 .overlay(RoundedRectangle(cornerRadius: Radio.md).stroke(Tema.bordeCampo, lineWidth: 1))
                 .onChange(of: concepto) { _, nuevo in
-                    if nuevo.count > Self.maximoConcepto { concepto = String(nuevo.prefix(Self.maximoConcepto)) }
+                    if nuevo.unicodeScalars.count > Self.maximoConcepto { concepto = Self.recortar(nuevo) }
                 }
                 .accessibilityLabel("Concepto del gasto")
             Button("Guardar gasto", action: guardarGasto)
@@ -136,6 +137,18 @@ struct HojaFacturacion: View {
         guard let v = valor else { return }
         modelo.hacer("facturacion", [String(v)])
         cerrar()
+    }
+
+    /// Hasta 40 escalares Unicode, como corta el juego, sin partir ningún carácter.
+    private static func recortar(_ texto: String) -> String {
+        var salida = ""
+        var n = 0
+        for c in texto {
+            n += c.unicodeScalars.count
+            if n > maximoConcepto { break }
+            salida.append(c)
+        }
+        return salida
     }
 
     private func guardarGasto() {
