@@ -133,3 +133,15 @@ test('avisoCopia y copia en createProduct', () => {
   assert.strictEqual(createProduct(newState(), { name: 'A', place: 'casa', copia: true }).products[0].copia, true);
   assert.strictEqual(createProduct(newState(), { name: 'A', place: 'casa', copia: false }).products[0].copia, false);
 });
+
+test('entradas inválidas: sin cambios o null', () => {
+  const d = '2026-11-10';
+  const s = enTest(d);
+  assert.deepStrictEqual(apuntarVisitas(s, 'p1', NaN, at(d)), s);
+  assert.deepStrictEqual(apuntarVisitas(s, 'p1', -3, at(d)), s);
+  assert.deepStrictEqual(apuntarVisitas(s, 'p9', 300, at(d)), s);
+  assert.deepStrictEqual(guardarGancho(s, 'p9', 'Hola', 6000, at(d)), s);
+  assert.deepStrictEqual(guardarGancho(s, 'p1', 'Hola', 'mucho', at(d)), s);
+  assert.strictEqual(resumenDescarte(s, 'p9'), null);
+  assert.ok(avisoCopia(false, false, false).includes('sin margen'));
+});

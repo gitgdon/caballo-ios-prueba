@@ -179,7 +179,7 @@ function rollDay(state, now) {
   const s = clone(state);
   const day = dayKey(now);
   if (s.today.day !== day) s.today = { day, done: [], skipped: false, videos: 0, recordNotified: false, minimo: false };
-  if (!s.reto) s.reto = { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false };
+  if (!s.reto) s.reto = retoDe(s, day);
   for (const p of s.products) {
     if (p.status === 'test' && testDay(p, day) > 14) p.status = 'decision';
   }
@@ -525,9 +525,18 @@ function checkpointText(state) {
   return '🏁 Checkpoint guardado. Producto ' + n + (n > 30 ? '' : '/30') + ' desbloqueado';
 }
 
+function retoDe(s, day) {
+  return { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false };
+}
+
+function retoValido(meta, fin) {
+  return typeof meta === 'number' && Number.isFinite(meta) && Math.round(meta) > 0 &&
+    typeof fin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fin) && addDays(fin, 0) === fin;
+}
+
 function retoInfo(state, now) {
-  const r = state.reto;
   const hoy = dayKey(now);
+  const r = state.reto || retoDe(state, hoy);
   return {
     meta: r.meta,
     fin: r.fin,
@@ -543,6 +552,7 @@ function retoInfo(state, now) {
 function apuntarFacturacion(state, total, now) {
   const s = clone(state);
   if (typeof total !== 'number' || !Number.isFinite(total) || total < 0) return s;
+  if (!s.reto) s.reto = retoDe(s, dayKey(now));
   s.reto.facturado = Math.round(total);
   if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
     s.reto.cumplido = true;
@@ -553,24 +563,27 @@ function apuntarFacturacion(state, total, now) {
 
 function editarReto(state, meta, fin) {
   const s = clone(state);
-  s.reto.meta = meta;
+  if (!retoValido(meta, fin)) return s;
+  if (!s.reto) s.reto = retoDe(s, s.today.day || dayKey(new Date()));
+  s.reto.meta = Math.round(meta);
   s.reto.fin = fin;
   return s;
 }
 
 function nuevoReto(state, meta, fin, now) {
   const s = clone(state);
-  s.reto = { meta, fin, inicio: dayKey(now), base: totalVideos(s), facturado: 0, cumplido: false };
+  if (!retoValido(meta, fin)) return s;
+  s.reto = { meta: Math.round(meta), fin, inicio: dayKey(now), base: totalVideos(s), facturado: 0, cumplido: false };
   return s;
 }
 
 function avisoCopia(porQue, pidenEnlace, margen) {
   if (porQue === true && pidenEnlace === true && margen === true) return null;
   const faltan = [];
-  if (porQue !== true) faltan.push('saber por qué funcionó');
-  if (pidenEnlace !== true) faltan.push('que la gente pida el enlace');
-  if (margen !== true) faltan.push('tener margen');
-  return 'Ojo, sin ' + faltan.join(', ') + ' es más difícil que funcione. Puedes probarlo igual: los 14 días de test son la prueba.';
+  if (porQue !== true) faltan.push('sin saber por qué funcionó');
+  if (pidenEnlace !== true) faltan.push('sin que la gente pida el enlace');
+  if (margen !== true) faltan.push('sin margen');
+  return 'Ojo, ' + faltan.join(', ') + ' es más difícil que funcione. Puedes probarlo igual: los 14 días de test son la prueba.';
 }
 
 const FASES = [
@@ -604,6 +617,7 @@ function pideGancho(n) {
 
 function guardarGancho(state, productId, texto, n, now) {
   const s = clone(state);
+  if (!findProduct(s, productId) || typeof n !== 'number' || !Number.isFinite(n)) return s;
   const t = Array.from(String(texto == null ? '' : texto).trim()).slice(0, 80).join('');
   if (!t) return s;
   s.ganchos.push({ texto: t, producto: productId, visitas: n, dia: dayKey(now) });
@@ -616,6 +630,7 @@ function recomendacionDia14(puedeDiferente, sabesPorQue, ideasNuevas) {
 
 function resumenDescarte(state, productId) {
   const p = findProduct(state, productId);
+  if (!p) return null;
   const v = p.videos;
   const t = p.tecnicasPracticadas.length;
   const k = (state.ganchos || []).filter((g) => g.producto === productId).length;

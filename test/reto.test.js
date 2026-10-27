@@ -86,3 +86,36 @@ test('el 31-12 sigue vigente y el 01-01 vence sin castigo', () => {
   assert.strictEqual(v.vencido, true);
   assert.strictEqual(v.diasQuedan, 0);
 });
+
+test('sin reto en el estado: retoInfo no muta y los mutadores lo crean', () => {
+  const s = newState();
+  assert.strictEqual(s.reto, undefined);
+  const info = retoInfo(s, NOW);
+  assert.strictEqual(info.meta, 10000);
+  assert.strictEqual(info.diasQuedan, 65);
+  assert.strictEqual(s.reto, undefined);
+  assert.strictEqual(apuntarFacturacion(s, 300, NOW).reto.facturado, 300);
+  const e = editarReto(s, 5000, '2027-01-31');
+  assert.strictEqual(e.reto.meta, 5000);
+  assert.strictEqual(e.reto.base, 0);
+  assert.strictEqual(nuevoReto(s, 5000, '2027-01-31', NOW).reto.inicio, '2026-10-27');
+});
+
+test('editarReto y nuevoReto ignoran meta o fecha no válidas', () => {
+  const s = conReto();
+  for (const meta of [NaN, 0, -1, '500', Infinity, null, 0.2]) {
+    assert.deepStrictEqual(editarReto(s, meta, '2027-01-31'), s);
+    assert.deepStrictEqual(nuevoReto(s, meta, '2027-01-31', NOW), s);
+  }
+  for (const fin of ['31-12-2026', '2026-13-01', '2026-02-30', 'abc', null, '2026-1-1']) {
+    assert.deepStrictEqual(editarReto(s, 500, fin), s);
+    assert.deepStrictEqual(nuevoReto(s, 500, fin, NOW), s);
+  }
+  assert.strictEqual(editarReto(s, 499.6, '2027-01-31').reto.meta, 500);
+});
+
+test('rollDay conserva un reto existente', () => {
+  const s = apuntarFacturacion(conReto(), 700, NOW);
+  const otro = rollDay(s, at('2026-11-05'));
+  assert.deepStrictEqual(otro.reto, s.reto);
+});
