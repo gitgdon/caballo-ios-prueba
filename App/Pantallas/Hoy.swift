@@ -276,11 +276,13 @@ private struct FilaHistorias: View {
     private var historiaReto: some View {
         let r = vista.reto
         let dias = r?.diasQuedan ?? 0
-        let etiqueta = r.map { "Reto: \(euros($0.facturado)) de \(euros($0.meta)), quedan \($0.diasQuedan) días" } ?? "Reto"
+        let ultimoDia = r.map { $0.diasQuedan == 0 && !$0.vencido } ?? false
+        let plazo = ultimoDia ? "último día" : "quedan \(dias) días"
+        let etiqueta = r.map { "Reto: \(euros($0.facturado)) de \(euros($0.meta)), \(plazo)" } ?? "Reto"
         return Historia(titulo: "Reto", etiqueta: etiqueta,
                         progreso: r?.progreso ?? 0, color: Tema.Anillo.reto, nueva: nueva(.reto),
                         contenido: {
-                            Text("\(dias)d")
+                            Text(ultimoDia ? "Hoy" : "\(dias)d")
                                 .font(.system(size: 13, weight: .bold, design: .rounded))
                                 .foregroundStyle(Tema.texto)
                                 .minimumScaleFactor(0.6)
