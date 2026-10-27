@@ -19,6 +19,7 @@ struct Proveedor: TimelineProvider {
         let manana = Calendar.current.startOfDay(for: ahora.addingTimeInterval(24 * 3600)).addingTimeInterval(60)
         let entrada = Entrada(date: ahora, vista: Juego().preparar())
         completion(Timeline(entries: [entrada], policy: .after(min(mediaHora, manana))))
+        Task { await Avisos.reprogramar(Juego()) }
     }
 }
 

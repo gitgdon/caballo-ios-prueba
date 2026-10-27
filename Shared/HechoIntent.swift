@@ -21,6 +21,7 @@ struct HechoIntent: LiveActivityIntent {
         juego.accion("hecho", [misionId])
         WidgetCenter.shared.reloadAllTimelines()
         await Actividad.actualizar(juego.vista())
+        await Avisos.reprogramar(juego)
         return .result()
     }
 }

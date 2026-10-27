@@ -1,10 +1,42 @@
 import SwiftUI
+import UIKit
+import UserNotifications
 import WidgetKit
 
 @main
 struct CaballoApp: App {
+    @UIApplicationDelegateAdaptor(DelegadoApp.self) private var delegado
+
     var body: some Scene {
         WindowGroup { Raiz() }
+    }
+}
+
+final class DelegadoApp: NSObject, UIApplicationDelegate {
+    /// El centro de notificaciones guarda su delegado como referencia débil.
+    private let avisos = DelegadoAvisos()
+
+    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+        Avisos.registrarCategoria()
+        UNUserNotificationCenter.current().delegate = avisos
+        return true
+    }
+}
+
+/// El botón "Hecho" de la notificación marca la misión sin abrir la app.
+final class DelegadoAvisos: NSObject, UNUserNotificationCenterDelegate {
+    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        guard response.actionIdentifier == Avisos.accionHecho else { return }
+        let misionId = response.notification.request.content.userInfo["misionId"] as? String
+        let juego = Juego()
+        juego.accion("hechoAviso", [misionId ?? ""])
+        WidgetCenter.shared.reloadAllTimelines()
+        await Actividad.actualizar(juego.vista())
+        await Avisos.reprogramar(juego)
+    }
+
+    func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .list, .sound]
     }
 }
 
@@ -30,6 +62,7 @@ final class Modelo: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         let v = vista
         Task { await Actividad.actualizar(v) }
+        Task { await Avisos.reprogramar(Juego()) }
     }
 
     func hacer(_ nombre: String, _ args: [String] = []) {
@@ -62,6 +95,10 @@ struct Raiz: View {
         .tint(Tema.acento)
         .background(Tema.fondo)
         .onAppear { modelo.refrescar() }
+        .task {
+            await Avisos.pedirPermisoSiHaceFalta()
+            await Avisos.reprogramar(Juego())
+        }
         .onChange(of: fase) { _, nueva in if nueva == .active { modelo.refrescar() } }
         .sheet(isPresented: $hojaNuevo) {
             HojaNuevoProducto { nombre, lugar in
