@@ -13,8 +13,12 @@ jobs:
       - name: Instalar herramientas
         run: brew install xcodegen ldid
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
       - name: Probar el juego
-        run: node --test test/
+        run: node --test test/*.test.js
 
       - name: Generar proyecto de Xcode
         run: xcodegen generate

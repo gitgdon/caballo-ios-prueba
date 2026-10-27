@@ -252,9 +252,9 @@ function missionsForDay(state, now, extra) {
   }
   const tecs = extra && extra.tecnicas ? tecnicasDesbloqueadas(state, extra.tecnicas) : [];
   const hTec = hashDay(day + ':tec');
-  const firstVideo = out.find((x) => x.id.split(':')[1] === 'video');
+  const firstVideo = out.find((x) => x.id.split(':')[1] === 'video' && !doneToday.includes(x.id));
   if (tecs.length && hTec % 2 === 0 && firstVideo) {
-    const t = tecs[hTec % tecs.length];
+    const t = tecs[Math.floor(hTec / 2) % tecs.length];
     firstVideo.text += ' ' + t.variante;
     firstVideo.tecnica = t.id;
   }

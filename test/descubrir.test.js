@@ -130,7 +130,26 @@ test('primer vídeo: sin productos en test no hay modo', () => {
   assert.ok(missionsForDay(s, at('2026-10-21', 9)).some((x) => x.id === 'p1:video:1'));
 });
 
+test('primer vídeo + lo mínimo: solo la misión mínima, sin pasos de primer vídeo', () => {
+  const now = at('2026-10-21', 9);
+  const s0 = rollDay(enTest('2026-10-19'), now);
+  assert.strictEqual(c.canStartMinimo(s0, now), true);
+  const s = startMinimo(s0, now);
+  assert.deepStrictEqual(pendingMissions(s, now).map((x) => x.kind), ['minimo']);
+});
+
 // ── Encuentros raros ──
+
+test('encuentro raro: no sale en un día saltado ni con solo un producto en decisión', () => {
+  const d = findDay('2026-10-21', esRaro);
+  const now = at(d, 9);
+  const skipped = skipToday(enTest(d, { videos: 1 }), now);
+  assert.deepStrictEqual(pendingMissions(skipped, now, EXTRA), []);
+  assert.strictEqual(completeMission(skipped, 'p1:raro:e01', now, EXTRA).xp, 0);
+  const dec = createProduct(newState(), { name: 'P', place: 'casa' });
+  Object.assign(dec.products[0], { status: 'decision', videos: 1, testStartDay: addDays(d, -15) });
+  assert.deepStrictEqual(missionsForDay(dec, now, EXTRA).map((x) => x.kind), ['decision']);
+});
 
 test('encuentro raro: sale el día que toca, da su XP, cuenta racha y vídeo', () => {
   const d = findDay('2026-10-21', esRaro);
@@ -185,7 +204,7 @@ test('técnica en la primera misión de vídeo los días que toca', () => {
   const s = enTest(d, { videos: 1 });
   s.xp = 1000;
   const des = tecnicasDesbloqueadas(s, TECNICAS);
-  const t = des[hashDay(d + ':tec') % des.length];
+  const t = des[Math.floor(hashDay(d + ':tec') / 2) % des.length];
   const plain = missionsForDay(s, now).filter((x) => x.kind === 'video');
   const vids = missionsForDay(s, now, EXTRA).filter((x) => x.kind === 'video');
   assert.strictEqual(vids[0].text, plain[0].text + ' ' + t.variante);
@@ -196,6 +215,28 @@ test('técnica en la primera misión de vídeo los días que toca', () => {
   const otro = findDay('2026-10-21', (x) => !esTec(x));
   const s2 = enTest(otro, { videos: 1 });
   assert.ok(missionsForDay(s2, at(otro, 9), EXTRA).every((x) => x.tecnica === undefined));
+});
+
+test('con 2 técnicas desbloqueadas, salen las dos según el día', () => {
+  const seen = new Set();
+  for (let i = 0; i < 60; i++) {
+    const d = addDays('2026-10-21', i);
+    const s = enTest(d, { videos: 1 });
+    s.xp = 100;
+    for (const x of missionsForDay(s, at(d, 9), EXTRA)) if (x.tecnica) seen.add(x.tecnica);
+  }
+  assert.deepStrictEqual([...seen].sort(), ['t01', 't02']);
+});
+
+test('la técnica va en la primera misión de vídeo pendiente, no en la que marcó el primer vídeo', () => {
+  const d = findDay('2026-10-21', esTec);
+  const now = at(d, 9);
+  let s = enTest(addDays(d, -2));
+  s = completeMission(s, 'p1:primer:1', now, EXTRA);
+  s = completeMission(s, 'p1:primer:2', now, EXTRA);
+  const vids = pendingMissions(s, now, EXTRA).filter((x) => x.kind === 'video');
+  assert.deepStrictEqual(vids.map((x) => x.id), ['p1:video:2']);
+  assert.strictEqual(vids[0].tecnica, 't01');
 });
 
 test('completar una misión con técnica la apunta en el producto sin repetir', () => {
