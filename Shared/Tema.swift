@@ -32,6 +32,7 @@ enum Tema {
         static let racha = dinamico(0xCF4F22, 0xE8673A)
         static let producto = dinamico(0x357F6C, 0x4FA38E)
         static let frase = dinamico(0x9C6514, 0xD59A3C)
+        static let reto = dinamico(0xB07A10, 0xF2C14E)
     }
 
     /// Colores fijos (tokens oscuros) para la tarjeta de la pantalla de bloqueo, que siempre es oscura.

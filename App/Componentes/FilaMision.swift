@@ -9,9 +9,10 @@ struct FilaMision: View {
     var body: some View {
         HStack(spacing: Espacio.m) {
             VStack(alignment: .leading, spacing: Espacio.xs) {
-                Text(mision.bloque.uppercased())
-                    .font(.caption)
-                    .foregroundStyle(Tema.textoSuave)
+                Text(mision.etiquetaEspecial ?? mision.bloque.uppercased())
+                    .font(mision.etiquetaEspecial == nil ? .caption : .caption.bold())
+                    .foregroundStyle(mision.tipo == "raro" ? Tema.acento : Tema.textoSuave)
+                if let paso = mision.pasoPrimerVideo { PasosPrimerVideo(paso: paso) }
                 Text(mision.texto)
                     .font(.body)
                     .foregroundStyle(Tema.texto)

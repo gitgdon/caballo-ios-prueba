@@ -5,6 +5,18 @@ struct PaginaHistoria: Identifiable {
     let titulo: String
     let grande: String
     let pie: String?
+    /// Barra de 0 a 1 bajo el texto grande.
+    var progreso: Double? = nil
+    /// Texto normal entre lo grande y el pie.
+    var cuerpo: String? = nil
+    var boton: BotonPagina? = nil
+}
+
+/// Botón al pie de una página del visor (p. ej. "Apuntar facturación").
+struct BotonPagina {
+    let titulo: String
+    let etiqueta: String
+    let accion: () -> Void
 }
 
 /// Visor a pantalla completa. Sin avance automático.
@@ -47,6 +59,12 @@ struct VisorHistorias: View {
                     .accessibilityLabel("Cerrar")
                 }
                 Spacer()
+                if paginas.indices.contains(indice), let boton = paginas[indice].boton {
+                    Button(boton.titulo, action: boton.accion)
+                        .buttonStyle(.principal)
+                        .accessibilityLabel(boton.etiqueta)
+                        .padding(.bottom, Espacio.l)
+                }
             }
             .padding(.horizontal, Espacio.l)
             .padding(.top, Espacio.s)
@@ -66,6 +84,15 @@ struct VisorHistorias: View {
                 .font(.largeTitle.bold())
                 .foregroundStyle(Tema.texto)
                 .multilineTextAlignment(.center)
+            if let progreso = pagina.progreso {
+                BarraVisor(progreso: progreso)
+            }
+            if let cuerpo = pagina.cuerpo {
+                Text(cuerpo)
+                    .font(.body)
+                    .foregroundStyle(Tema.texto)
+                    .multilineTextAlignment(.center)
+            }
             if let pie = pagina.pie {
                 Text(pie)
                     .font(.footnote)
@@ -114,6 +141,23 @@ struct VisorHistorias: View {
             }
         }
         .padding(.top, 72)
+    }
+}
+
+/// Barra de progreso del visor, en el color del texto para que se lea sobre el degradado.
+private struct BarraVisor: View {
+    let progreso: Double
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Tema.texto.opacity(0.25))
+                Capsule().fill(Tema.texto.opacity(0.9))
+                    .frame(width: geo.size.width * max(0, min(1, progreso)))
+            }
+        }
+        .frame(height: 8)
+        .accessibilityHidden(true)
     }
 }
 

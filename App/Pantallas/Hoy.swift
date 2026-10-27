@@ -11,7 +11,7 @@ struct Hoy: View {
             if let v = modelo.vista {
                 VStack(alignment: .leading, spacing: Espacio.m) {
                     cabecera(v)
-                    FilaHistorias(vista: v, aviso: $modelo.aviso)
+                    FilaHistorias(vista: v, modelo: modelo)
                     contenido(v)
                 }
                 .padding(.bottom, Espacio.xl)
@@ -92,15 +92,19 @@ struct Hoy: View {
 /// Las historias de arriba y su visor a pantalla completa.
 private struct FilaHistorias: View {
     let vista: Vista
-    /// El aviso se repite encima del visor para que no caduque tapado.
-    @Binding var aviso: String?
+    /// Para apuntar facturación y marcar técnicas vistas. Su aviso se repite encima del visor
+    /// para que no caduque tapado.
+    @ObservedObject var modelo: Modelo
     @AppStorage("medallaVista") private var medallaVista = -1
+    /// Cuántas medallas ocultas había la última vez que se abrió la historia Medalla.
+    @AppStorage("secretasVistas") private var secretasVistas = -1
     @AppStorage("historiasVistas") private var historiasVistas = ""
     @State private var visor: VisorAbierto?
+    @State private var hojaFacturacion = false
 
     private static let medallas = [7, 30, 100, 365]
 
-    private enum Tipo: String, Hashable { case frase, racha, nivel, producto, medalla }
+    private enum Tipo: String, Hashable { case frase, tecnica, reto, medalla, racha, nivel, producto }
 
     private struct VisorAbierto: Identifiable {
         let id = UUID()
@@ -134,14 +138,27 @@ private struct FilaHistorias: View {
         return m
     }
 
+    /// Medallas ocultas ganadas desde la última vez que se abrió la historia Medalla.
+    private var secretasNuevas: [Secreta] {
+        guard secretasVistas >= 0, vista.secretas.count > secretasVistas else { return [] }
+        return Array(vista.secretas.suffix(vista.secretas.count - secretasVistas))
+    }
+
     private var siguienteMedalla: Int? { Self.medallas.first { $0 > vista.racha } }
+
+    /// Las técnicas recién desbloqueadas (las de nivel más alto).
+    private var tecnicasNuevas: [Tecnica] {
+        Array(vista.tecnicas.filter(\.desbloqueada).suffix(vista.tecnicasNuevas))
+    }
 
     private var tipos: [Tipo] {
         var t: [Tipo] = []
         if vista.frase != nil || vista.porque != nil { t.append(.frase) }
+        if vista.tecnicasNuevas > 0 { t.append(.tecnica) }
+        if vista.reto != nil { t.append(.reto) }
+        if medallaNueva != nil || !secretasNuevas.isEmpty { t.append(.medalla) }
         t.append(contentsOf: [.racha, .nivel])
         if vista.producto != nil { t.append(.producto) }
-        if medallaNueva != nil { t.append(.medalla) }
         return t
     }
 
@@ -158,18 +175,35 @@ private struct FilaHistorias: View {
         .onAppear {
             // Primer arranque: la medalla que ya había no cuenta como nueva.
             if medallaVista < 0 { medallaVista = vista.medallas.max() ?? 0 }
+            if secretasVistas < 0 { secretasVistas = vista.secretas.count }
         }
         .fullScreenCover(item: $visor) { abierto in
-            VisorHistorias(paginas: abierto.paginas, inicio: abierto.inicio)
-                .avisoLogro(texto: $aviso)
+            // La página del reto se recalcula para enseñar lo recién apuntado.
+            VisorHistorias(paginas: abierto.paginas.map { $0.id == "reto" ? paginaReto : $0 },
+                           inicio: abierto.inicio)
+                .sheet(isPresented: $hojaFacturacion) {
+                    HojaFacturacion(modelo: modelo)
+                        .presentationDetents([.medium])
+                        .presentationBackground(Tema.fondo)
+                }
+                .avisoLogro(texto: $modelo.aviso)
         }
     }
 
     private func abrir(_ t: Tipo) {
-        let lista = tipos
-        visor = VisorAbierto(paginas: lista.map { pagina($0) }, inicio: lista.firstIndex(of: t) ?? 0)
+        var lista: [PaginaHistoria] = []
+        var inicio = 0
+        for tipo in tipos {
+            if tipo == t { inicio = lista.count }
+            lista += paginas(tipo)
+        }
+        visor = VisorAbierto(paginas: lista, inicio: inicio)
         marcarVista(t)
-        if t == .medalla, let m = medallaNueva { medallaVista = m }
+        if t == .medalla {
+            if let m = medallaNueva { medallaVista = m }
+            secretasVistas = vista.secretas.count
+        }
+        if t == .tecnica { modelo.hacer("tecnicaVista") }
     }
 
     // MARK: Círculos
@@ -177,6 +211,8 @@ private struct FilaHistorias: View {
     @ViewBuilder private func historia(_ t: Tipo) -> some View {
         switch t {
         case .frase: historiaFrase
+        case .tecnica: historiaTecnica
+        case .reto: historiaReto
         case .racha: historiaRacha
         case .nivel: historiaNivel
         case .producto: historiaProducto
@@ -194,6 +230,34 @@ private struct FilaHistorias: View {
                          .foregroundStyle(Tema.texto)
                  },
                  accion: { abrir(.frase) })
+    }
+
+    private var historiaTecnica: some View {
+        let n = vista.tecnicasNuevas
+        return Historia(titulo: "Técnica",
+                        etiqueta: n == 1 ? "Técnica nueva desbloqueada" : "Técnicas desbloqueadas: \(n)",
+                        progreso: 1, color: Tema.acento, nueva: nueva(.tecnica),
+                        contenido: {
+                            Text("✦")
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .foregroundStyle(Tema.texto)
+                        },
+                        accion: { abrir(.tecnica) })
+    }
+
+    private var historiaReto: some View {
+        let r = vista.reto
+        let dias = r?.diasQuedan ?? 0
+        let etiqueta = r.map { "Reto: \(euros($0.facturado)) de \(euros($0.meta)), quedan \($0.diasQuedan) días" } ?? "Reto"
+        return Historia(titulo: "Reto", etiqueta: etiqueta,
+                        progreso: r?.progreso ?? 0, color: Tema.Anillo.reto, nueva: nueva(.reto),
+                        contenido: {
+                            Text("\(dias)d")
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundStyle(Tema.texto)
+                                .minimumScaleFactor(0.6)
+                        },
+                        accion: { abrir(.reto) })
     }
 
     private var etiquetaRacha: String {
@@ -244,8 +308,13 @@ private struct FilaHistorias: View {
     }
 
     private var historiaMedalla: some View {
-        let m = medallaNueva ?? 0
-        return Historia(titulo: "Medalla", etiqueta: "Medalla nueva: \(m) días seguidos",
+        let etiqueta: String
+        if let m = medallaNueva {
+            etiqueta = "Medalla nueva: \(m) días seguidos"
+        } else {
+            etiqueta = "Medalla oculta: " + secretasNuevas.map(\.nombre).joined(separator: ", ")
+        }
+        return Historia(titulo: "Medalla", etiqueta: etiqueta,
                         progreso: 1, color: Tema.Anillo.xp, nueva: true,
                         contenido: { Text("🏅").font(.title2) },
                         accion: { abrir(.medalla) })
@@ -253,19 +322,85 @@ private struct FilaHistorias: View {
 
     // MARK: Páginas del visor
 
-    private func pagina(_ t: Tipo) -> PaginaHistoria {
+    private func paginas(_ t: Tipo) -> [PaginaHistoria] {
         switch t {
-        case .frase: return paginaFrase
-        case .racha: return paginaRacha
+        case .frase: return [paginaFrase] + (paginaConsejo.map { [$0] } ?? [])
+        case .tecnica: return [paginaTecnica]
+        case .reto: return [paginaReto]
+        case .racha: return [paginaRacha]
         case .nivel:
-            return PaginaHistoria(id: "nivel", titulo: "Nivel",
-                                  grande: "Nivel \(vista.nivel) · \(vista.rango)",
-                                  pie: "\(vista.xp) / \(vista.xpSig) XP")
-        case .producto: return paginaProducto
-        case .medalla:
-            return PaginaHistoria(id: "medalla", titulo: "Medalla",
-                                  grande: "🏅 \(medallaNueva ?? 0) días seguidos", pie: nil)
+            return [PaginaHistoria(id: "nivel", titulo: "Nivel",
+                                   grande: "Nivel \(vista.nivel) · \(vista.rango)",
+                                   pie: "\(vista.xp) / \(vista.xpSig) XP")]
+        case .producto: return [paginaProducto]
+        case .medalla: return paginasMedalla
         }
+    }
+
+    private var paginasMedalla: [PaginaHistoria] {
+        var lista: [PaginaHistoria] = []
+        if let m = medallaNueva {
+            lista.append(PaginaHistoria(id: "medalla", titulo: "Medalla", grande: "🏅 \(m) días seguidos", pie: nil))
+        }
+        for s in secretasNuevas {
+            lista.append(PaginaHistoria(id: "secreta-" + s.id, titulo: "Medalla oculta", grande: "🏅 " + s.nombre, pie: nil))
+        }
+        return lista
+    }
+
+    private var paginaConsejo: PaginaHistoria? {
+        guard let c = vista.consejo else { return nil }
+        return PaginaHistoria(id: "consejo", titulo: "Consejo de " + c.autor, grande: c.texto, pie: nil)
+    }
+
+    private var paginaTecnica: PaginaHistoria {
+        let nuevas = tecnicasNuevas
+        if nuevas.count == 1, let t = nuevas.first {
+            return PaginaHistoria(id: "tecnica", titulo: "Técnica desbloqueada · Nivel \(t.nivel)",
+                                  grande: t.titulo, pie: "A partir de hoy la verás en algunas misiones",
+                                  cuerpo: t.texto)
+        }
+        return PaginaHistoria(id: "tecnica", titulo: "Técnicas desbloqueadas: \(nuevas.count)",
+                              grande: "✦", pie: nil,
+                              cuerpo: nuevas.map(\.titulo).joined(separator: "\n"))
+    }
+
+    private static let formatoFin: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    /// "2026-12-31" → "31 dic".
+    private static func diaCorto(_ fin: String) -> String {
+        guard let fecha = formatoFin.date(from: fin) else { return fin }
+        return fecha.formatted(.dateTime.day().month(.abbreviated).locale(Locale(identifier: "es_ES")))
+    }
+
+    private var paginaReto: PaginaHistoria {
+        guard let r = vista.reto else {
+            return PaginaHistoria(id: "reto", titulo: "Reto", grande: "", pie: nil)
+        }
+        let plazo: String
+        if r.cumplido {
+            plazo = "🏆 Reto cumplido"
+        } else if r.vencido {
+            plazo = "El plazo acabó el \(Self.diaCorto(r.fin)). Puedes empezar otro en Más"
+        } else if r.diasQuedan == 1 {
+            plazo = "Queda 1 día, hasta el \(Self.diaCorto(r.fin))"
+        } else {
+            plazo = "Quedan \(r.diasQuedan) días, hasta el \(Self.diaCorto(r.fin))"
+        }
+        let boton = BotonPagina(titulo: "Apuntar facturación", etiqueta: "Apuntar facturación") {
+            hojaFacturacion = true
+        }
+        return PaginaHistoria(id: "reto", titulo: "Reto · Facturado", grande: euros(r.facturado),
+                              pie: r.videos == 1 ? "1 vídeo subido en el reto" : "\(r.videos) vídeos subidos en el reto",
+                              progreso: r.progreso,
+                              cuerpo: "de \(euros(r.meta))\n" + plazo,
+                              boton: boton)
     }
 
     private var paginaFrase: PaginaHistoria {
