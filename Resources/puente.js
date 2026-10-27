@@ -93,6 +93,11 @@ function avisos(json) {
   return JSON.stringify(planAvisos(parseState(json), new Date(), FRASES, EXTRA_PUENTE));
 }
 
+// Calendario de dinero del mes 'YYYY-MM' (calendarioMes de core.js); 'null' si el mes no es válido.
+function calendario(json, mes) {
+  return JSON.stringify(calendarioMes(parseState(json), mes));
+}
+
 // La misión del aviso si sigue pendiente; si no, la siguiente de vídeo o ensayo; si no hay, ninguna.
 function misionDelAviso(s, id, now) {
   var pendientes = pendingMissions(rollDay(s, now), now, EXTRA_PUENTE);
@@ -127,6 +132,8 @@ function accion(json, nombre, argsJson) {
     case 'facturacion': s = apuntarFacturacion(s, numeroPuente(a[0]), now); break;
     case 'reto': s = editarReto(s, numeroPuente(a[0]), a[1]); break;
     case 'retoNuevo': s = nuevoReto(s, numeroPuente(a[0]), a[1], now); break;
+    case 'gasto': s = anadirGasto(s, numeroPuente(a[0]), a[1], now); break;
+    case 'borrarMovimiento': s = borrarMovimiento(s, numeroPuente(a[0])); break;
     case 'visitas': {
       var n = enteroValido(numeroPuente(a[1]));
       s = apuntarVisitas(s, a[0], n, now);

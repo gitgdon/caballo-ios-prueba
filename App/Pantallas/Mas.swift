@@ -26,6 +26,7 @@ struct Mas: View {
             seccionPorque
             if let f = modelo.vista?.frase { seccionFrase(f) }
             if let v = modelo.vista { seccionBancos(v) }
+            seccionCalendario
             SeccionAvisos(modelo: modelo)
             if let r = modelo.vista?.reto { SeccionReto(modelo: modelo, reto: r) }
             seccionAjustes
@@ -106,6 +107,17 @@ struct Mas: View {
                 ListaGanchos(ganchos: v.ganchos, productos: v.productos)
             } label: {
                 filaEnlace("Mis ganchos", detalle: v.ganchos.isEmpty ? nil : "\(v.ganchos.count)")
+            }
+        }
+        .listRowBackground(Tema.superficie)
+    }
+
+    private var seccionCalendario: some View {
+        Section {
+            NavigationLink {
+                Calendario(modelo: modelo)
+            } label: {
+                filaEnlace("Calendario", detalle: nil)
             }
         }
         .listRowBackground(Tema.superficie)

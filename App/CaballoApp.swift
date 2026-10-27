@@ -84,6 +84,11 @@ final class Modelo: ObservableObject {
         return r
     }
 
+    /// Calendario de dinero del mes "YYYY-MM".
+    func calendario(mes: String) -> CalendarioMes? {
+        juego.calendario(mes: mes)
+    }
+
     /// Aviso amable para una copia a la que le falta alguna comprobación; nil si las cumple.
     func avisoCopia(_ porQue: Bool, _ pidenEnlace: Bool, _ margen: Bool) -> String? {
         juego.avisoCopia(porQue, pidenEnlace, margen)

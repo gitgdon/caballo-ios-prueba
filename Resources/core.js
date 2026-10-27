@@ -68,6 +68,7 @@ function newState() {
     tecnicasVistas: 0,
     ganchos: [],
     avisos: { activos: true, hora: '18:00' },
+    movimientos: [],
   };
 }
 
@@ -87,6 +88,7 @@ function normalizeState(s) {
   s.avisos = Object.assign(d.avisos, s.avisos);
   s.avisos.hora = horaValida(s.avisos.hora);
   s.today = Object.assign(d.today, s.today);
+  if (!Array.isArray(s.movimientos)) s.movimientos = d.movimientos;
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
     if (p.videos === undefined) p.videos = 0;
@@ -563,12 +565,71 @@ function apuntarFacturacion(state, total, now) {
   const t = enteroValido(total);
   if (t === null) return s;
   if (!s.reto) s.reto = retoDe(s, dayKey(now));
+  // El día recibe la diferencia con el total anterior (negativa si se corrige a la baja).
+  const antes = Number.isFinite(s.reto.facturado) ? s.reto.facturado : 0;
+  if (t !== antes) {
+    if (!Array.isArray(s.movimientos)) s.movimientos = [];
+    s.movimientos.push({ dia: dayKey(now), tipo: 'ingreso', importe: t - antes, concepto: 'Facturación' });
+  }
   s.reto.facturado = t;
   if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
     s.reto.cumplido = true;
     ganarSecreta(s, 'reto-cumplido');
   }
   return s;
+}
+
+// Los gastos se guardan redondeados a céntimos; los ingresos son enteros (diferencias de totales enteros).
+const centimos = (x) => Math.round(x * 100) / 100;
+const GASTO_CONCEPTO_MAX = 40;
+
+// Gasto apuntado a mano (no resta del reto). Ignora importes no finitos, ≤ 0 o mayores que MAX_SAFE_INTEGER.
+function anadirGasto(state, importe, concepto, now) {
+  const s = clone(state);
+  if (typeof importe !== 'number' || !Number.isFinite(importe)) return s;
+  const v = centimos(importe);
+  if (v <= 0 || v > Number.MAX_SAFE_INTEGER) return s;
+  const texto = Array.from(String(concepto == null ? '' : concepto).trim()).slice(0, GASTO_CONCEPTO_MAX).join('').trim();
+  if (!Array.isArray(s.movimientos)) s.movimientos = [];
+  s.movimientos.push({ dia: dayKey(now), tipo: 'gasto', importe: v, concepto: texto || 'Gasto' });
+  return s;
+}
+
+// Solo se borran gastos; los ingresos salen de la facturación.
+function borrarMovimiento(state, indice) {
+  const s = clone(state);
+  const m = Array.isArray(s.movimientos) && Number.isInteger(indice) ? s.movimientos[indice] : null;
+  if (m && m.tipo === 'gasto') s.movimientos.splice(indice, 1);
+  return s;
+}
+
+// Un elemento por día del mes 'YYYY-MM' (null si no es un mes válido). neto = ingresos − gastos.
+// `indice` de cada movimiento es su posición en state.movimientos (para borrarMovimiento).
+function calendarioMes(state, mes) {
+  if (typeof mes !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) return null;
+  const [y, m] = mes.split('-').map(Number);
+  const n = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const dias = [];
+  for (let i = 1; i <= n; i++) dias.push({ dia: mes + '-' + pad(i), ingresos: 0, gastos: 0, neto: 0, movimientos: [] });
+  (Array.isArray(state.movimientos) ? state.movimientos : []).forEach((x, indice) => {
+    if (!x || typeof x.dia !== 'string' || x.dia.slice(0, 7) !== mes) return;
+    if ((x.tipo !== 'ingreso' && x.tipo !== 'gasto') || !Number.isFinite(x.importe)) return;
+    const d = dias[Number(x.dia.slice(8)) - 1];
+    if (!d || d.dia !== x.dia) return;
+    if (x.tipo === 'ingreso') d.ingresos = centimos(d.ingresos + x.importe);
+    else d.gastos = centimos(d.gastos + x.importe);
+    d.movimientos.push({ indice, tipo: x.tipo, importe: x.importe, concepto: String(x.concepto) });
+  });
+  let total = 0;
+  let verdes = 0;
+  let rojos = 0;
+  for (const d of dias) {
+    d.neto = centimos(d.ingresos - d.gastos);
+    total = centimos(total + d.neto);
+    if (d.neto > 0) verdes++;
+    if (d.neto < 0) rojos++;
+  }
+  return { mes, dias, total, verdes, rojos };
 }
 
 function editarReto(state, meta, fin) {
@@ -793,5 +854,6 @@ if (typeof module !== 'undefined') {
     RETO_META, RETO_FIN, retoInfo, apuntarFacturacion, editarReto, nuevoReto, avisoCopia,
     FASES, faseDeVisitas, apuntarVisitas, pideGancho, guardarGancho, recomendacionDia14, resumenDescarte,
     AVISO_CATEGORIAS, configurarAvisos, planAvisos,
+    anadirGasto, borrarMovimiento, calendarioMes,
   };
 }

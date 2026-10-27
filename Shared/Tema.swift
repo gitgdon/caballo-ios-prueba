@@ -25,6 +25,9 @@ enum Tema {
     static let sobreAcento = dinamico(0xFFFFFF, 0x1F1A14)
     static let exito = dinamico(0x24704A, 0x5CC48A)
     static let peligro = dinamico(0xB3261E, 0xFF7A6E)
+    /// Texto sobre `exito` y sobre `peligro` (casillas del calendario).
+    static let sobreExito = dinamico(0xFFFFFF, 0x1F1A14)
+    static let sobrePeligro = dinamico(0xFFFFFF, 0x1F1A14)
     static let aviso = dinamico(0x8F5300, 0xF2B04F)
 
     enum Anillo {

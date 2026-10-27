@@ -156,6 +156,22 @@ struct AvisoPlan: Decodable, Identifiable {
     let tipo: String
 }
 
+/// Calendario de dinero de un mes (calendarioMes de core.js): un día por cada día del mes.
+/// Importes en euros como Double: los ingresos son enteros y los gastos pueden llevar céntimos.
+struct CalendarioMes: Decodable {
+    /// `indice` es la posición en el estado (para "borrarMovimiento"); `tipo` es ingreso o gasto.
+    struct Movimiento: Decodable, Identifiable {
+        let indice: Int, tipo: String, importe: Double, concepto: String
+        var id: Int { indice }
+    }
+    /// `dia` es "YYYY-MM-DD"; neto = ingresos − gastos.
+    struct Dia: Decodable, Identifiable {
+        let dia: String, ingresos: Double, gastos: Double, neto: Double, movimientos: [Movimiento]
+        var id: String { dia }
+    }
+    let mes: String, dias: [Dia], total: Double, verdes: Int, rojos: Int
+}
+
 struct Resultado: Decodable {
     let estado: String
     let logros: [String]
@@ -228,6 +244,12 @@ final class Juego {
         guard let json = llamar("avisos", [estado ?? NSNull()]),
               let plan = try? JSONDecoder().decode([AvisoPlan].self, from: Data(json.utf8)) else { return [] }
         return plan
+    }
+
+    /// Calendario de dinero del mes "YYYY-MM"; nil si el mes no es válido.
+    func calendario(mes: String) -> CalendarioMes? {
+        guard let json = llamar("calendario", [estado ?? NSNull(), mes]) else { return nil }
+        return try? JSONDecoder().decode(CalendarioMes.self, from: Data(json.utf8))
     }
 
     /// Aviso amable (no bloquea) si a la copia le falta alguna de las tres comprobaciones; nil si las cumple.
