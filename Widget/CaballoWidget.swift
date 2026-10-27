@@ -239,15 +239,25 @@ private func metaCorta(_ meta: Int) -> String {
 struct RetoRectangular: View {
     let r: Reto
 
+    /// "Reto Q4" solo si el reto acaba en octubre, noviembre o diciembre.
+    private var titulo: String {
+        let partes = r.fin.split(separator: "-")
+        let mes = partes.count == 3 ? Int(partes[1]) ?? 0 : 0
+        return (10...12).contains(mes) ? "Reto Q4" : "Reto"
+    }
+
     var body: some View {
+        let dias = max(r.diasQuedan, 0)
+        let textoDias = "\(dias) \(dias == 1 ? "día" : "días")"
+        let textoVideos = "\(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")"
         VStack(alignment: .leading, spacing: 2) {
-            Text("Reto Q4 · \(r.diasQuedan) \(r.diasQuedan == 1 ? "día" : "días")").font(.headline).lineLimit(1)
+            Text("\(titulo) · \(textoDias)").font(.headline).lineLimit(1)
             ProgressView(value: min(max(r.progreso, 0), 1)).progressViewStyle(.linear)
-            Text("\(euros(r.facturado)) de \(metaCorta(r.meta)) · \(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")")
+            Text("\(euros(r.facturado)) de \(metaCorta(r.meta)) · \(textoVideos)")
                 .font(.caption).lineLimit(1).minimumScaleFactor(0.7)
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Reto: \(miles(r.facturado)) euros de \(miles(r.meta)), quedan \(r.diasQuedan) \(r.diasQuedan == 1 ? "día" : "días"), \(r.videos) \(r.videos == 1 ? "vídeo" : "vídeos")")
+        .accessibilityLabel("\(titulo): \(miles(r.facturado)) euros de \(miles(r.meta)), quedan \(textoDias), \(textoVideos)")
     }
 }
 
@@ -259,7 +269,7 @@ struct VistaReto: View {
             if let r = entrada.vista?.reto {
                 RetoRectangular(r: r)
             } else {
-                Text("Abre Caballo Blanco")
+                Text("Abre Caballo Blanco").lineLimit(2).minimumScaleFactor(0.8)
             }
         }
         .containerBackground(for: .widget) { Color.clear }
