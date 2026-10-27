@@ -67,6 +67,7 @@ function newState() {
     secretas: [],
     tecnicasVistas: 0,
     ganchos: [],
+    avisos: { activos: true, hora: '18:00' },
   };
 }
 
@@ -83,6 +84,7 @@ function normalizeState(s) {
   s.secretas = s.secretas || d.secretas;
   if (s.tecnicasVistas === undefined) s.tecnicasVistas = d.tecnicasVistas;
   s.ganchos = s.ganchos || d.ganchos;
+  s.avisos = Object.assign(d.avisos, s.avisos);
   s.today = Object.assign(d.today, s.today);
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
@@ -693,6 +695,69 @@ function skipQuote(quotes, now) {
   return pool[hashDay(dayKey(now)) % pool.length];
 }
 
+const AVISO_CATEGORIAS = ['verguenza', 'accion', 'imperfecto'];
+const AVISO_TITULO = 'Caballo Blanco';
+const AVISO_CALLE = 'Solo 3 tomas de prueba, no se publican · ';
+const AVISO_TOPE = 22 * 60;
+const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function configurarAvisos(state, activos, hora) {
+  const s = clone(state);
+  s.avisos = Object.assign({ activos: true, hora: '18:00' }, s.avisos);
+  if (typeof activos === 'boolean') s.avisos.activos = activos;
+  if (typeof hora === 'string' && HORA_RE.test(hora)) s.avisos.hora = hora;
+  return s;
+}
+
+// Horas del día en minutos: hora, hora + 3 h… hasta las 22:00. Si hora ≥ 22:00, solo esa.
+function horasAviso(hora) {
+  const [h, m] = hora.split(':').map(Number);
+  const out = [h * 60 + m];
+  while (out[out.length - 1] + 180 <= AVISO_TOPE) out.push(out[out.length - 1] + 180);
+  return out;
+}
+
+function avisosDelDia(s, day, dayNow, now, quotes, extra, conRacha) {
+  if (s.today.skipped || s.today.minimo) return [];
+  const [y, mo, d] = day.split('-').map(Number);
+  const slots = horasAviso(s.avisos.hora);
+  const racha = conRacha && s.today.done.length === 0 ? streakNow(s, now) : 0;
+  if (racha > 0 && !slots.includes(AVISO_TOPE)) slots.push(AVISO_TOPE);
+  const videos = pendingMissions(s, dayNow, extra).filter((m) => m.kind === 'video' || m.kind === 'ensayo');
+  const cats = primerVideoActivo(s, dayNow) ? ['imperfecto', 'accion'] : AVISO_CATEGORIAS;
+  const pool = byId((quotes || []).filter((q) => cats.includes(q.categoria) && q.id !== s.quote.id));
+  const start = hashDay(day + ':aviso');
+  const out = [];
+  slots.forEach((min, i) => {
+    if (new Date(y, mo - 1, d, Math.floor(min / 60), min % 60).getTime() <= now.getTime()) return;
+    const hhmm = pad(Math.floor(min / 60)) + pad(min % 60);
+    const base = { id: 'aviso-' + day + '-' + hhmm, fecha: day + 'T' + hhmm.slice(0, 2) + ':' + hhmm.slice(2), titulo: AVISO_TITULO };
+    if (racha > 0 && min === AVISO_TOPE) {
+      out.push(Object.assign(base, { cuerpo: 'Tu racha de ' + racha + ' días se acaba hoy.\n' + MINIMO_TEXT, misionId: null, tipo: 'racha' }));
+      return;
+    }
+    if (videos.length === 0) return;
+    const m = videos[0];
+    const n = videos.length;
+    let l2 = i === 0 ? m.text : 'Te quedan ' + n + (n === 1 ? ' vídeo' : ' vídeos') + ' hoy · ' + m.text;
+    if (findProduct(s, m.productId).place === 'calle') l2 = AVISO_CALLE + l2;
+    const l1 = pool.length ? pool[(start + i) % pool.length].texto + '\n' : '';
+    out.push(Object.assign(base, { cuerpo: l1 + l2, misionId: m.id, tipo: i === 0 ? 'grabar' : 'repetir' }));
+  });
+  return out;
+}
+
+function planAvisos(state, now, quotes, extra) {
+  if (state.avisos && state.avisos.activos === false) return [];
+  const hoy = rollDay(normalizeState(clone(state)), now);
+  const manana = addDays(dayKey(now), 1);
+  const [y, m, d] = manana.split('-').map(Number);
+  const mananaNow = new Date(y, m - 1, d, 0, 1);
+  const sManana = rollDay(hoy, mananaNow);
+  return avisosDelDia(hoy, dayKey(now), now, now, quotes, extra, true)
+    .concat(avisosDelDia(sManana, manana, mananaNow, now, quotes, extra, false));
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     dayKey, addDays, daysBetween, blockOf, levelInfo, newState, parseState,
@@ -709,5 +774,6 @@ if (typeof module !== 'undefined') {
     PRIMER_ENSAYO_TEXT, PRIMER_PUBLICA_TEXT,
     RETO_META, RETO_FIN, retoInfo, apuntarFacturacion, editarReto, nuevoReto, avisoCopia,
     FASES, faseDeVisitas, apuntarVisitas, pideGancho, guardarGancho, recomendacionDia14, resumenDescarte,
+    AVISO_CATEGORIAS, configurarAvisos, planAvisos,
   };
 }
