@@ -127,6 +127,39 @@ La auditoría (riesgo de Kelbert: abandonar la primera semana) dejó 4 puntos ab
   - El paso 1 cuenta para la racha y da el XP base. El paso 2 cuenta como vídeo normal.
   - Si el paso 2 no se publica, al día siguiente se vuelve a empezar desde el paso 1. El día de test sigue avanzando como siempre.
 
+## 6. Aprender de cada producto
+
+**Por qué:** al usuario le preocupa que un producto comprado "no genere nada y sea una pérdida de tiempo". Pidió incluir las cinco piezas siguientes ("Pon todo"). Las ideas salen de la investigación de la ronda 3 (`WHorse/docs/investigacion/ronda-3/`, sobre todo Marc Verdú).
+
+- **"¿Lo has visto viral?" al crear un producto.**
+  - Si dice que sí (está copiando un producto que funciona), salen tres comprobaciones rápidas: ¿sabes por qué funcionó?, ¿la gente pide el enlace en los comentarios?, ¿tiene margen? Si alguna es "no", se muestra un aviso amable. Nunca bloquea: el usuario puede crearlo igual.
+  - Si dice que no (producto nuevo), no hay preguntas. El producto se presenta como un experimento: "el test de 14 días es la prueba".
+  - El usuario remarcó que con un producto nuevo no se puede saber si será viral hasta probarlo. Por eso las preguntas solo se hacen cuando es una copia.
+- **Lo que te llevas al descartar.** Hoy el descarte ya da 100 XP y muestra "🏁 Checkpoint guardado. Producto N/30 desbloqueado". Ese mismo aviso añade lo que te llevas: vídeos hechos con ese producto, técnicas practicadas en sus misiones y ganchos guardados en el banco. Sin pantalla nueva.
+- **"¿Dónde se cae mi vídeo?" (sistema de fases de Marc Verdú).**
+  - Al marcar una misión de métricas, o desde el producto, el usuario puede apuntar las visitas de un vídeo. La app le dice en qué fase falla y qué cambiar en el siguiente:
+
+    | Visitas | Dónde falla | Qué cambiar |
+    |---|---|---|
+    | < ~250 | No arranca | Originalidad, luz, lente limpia, clips propios |
+    | ~250–2.000 | Segundos 0–2 | El gancho |
+    | ~2.000–5.000 | Segundos 2–5 | El ritmo: algo nuevo cada 2 s |
+    | ~5.000–10.000 | El cierre | El final |
+    | 10.000+ | Interacción | Una pregunta o sorpresa al final para que comenten |
+
+  - La primera fila incluye también la fase "100–200 visitas = palabras clave". El constructor decide cómo encajarla sin solapar tramos.
+  - La sugerencia se convierte en la próxima misión de vídeo de ese producto, por ejemplo "· cambia solo el gancho".
+- **Revisión del día 14 con preguntas.** Antes del "¿ha vendido?" actual, si el producto tuvo visitas pero no ventas, tres preguntas:
+  1. ¿Puedes hacerlo diferente?
+  2. ¿Sabes por qué no vende?
+  3. ¿Tienes ideas nuevas?
+
+  Si alguna es "no", la app recomienda soltarlo. Si todas son "sí", recomienda seguir. La decisión sigue siendo del usuario, con las opciones actuales.
+- **Banco de ganchos.**
+  - Al apuntar visitas de un vídeo que llega a la fase de cierre o más (~5.000+), la app pregunta "¿Qué gancho usaste?" (texto corto) y lo guarda con el producto y las visitas.
+  - El banco se ve como una fila "Mis ganchos" en Más.
+  - De vez en cuando, las misiones de vídeo proponen reutilizar uno: "· reutiliza tu gancho «…»".
+
 ---
 
 ## Qué se queda igual
