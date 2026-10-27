@@ -3,7 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   newState, createProduct, rollDay, pendingMissions, completeMission, skipToday, startMinimo,
-  normalizeState, parseState, MINIMO_TEXT, planAvisos, configurarAvisos, AVISO_CATEGORIAS,
+  normalizeState, parseState, MINIMO_TEXT, pickDailyQuote, planAvisos, configurarAvisos, AVISO_CATEGORIAS,
 } = require('../Resources/core.js');
 const { FRASES } = require('../Resources/frases.js');
 const { TECNICAS } = require('../Resources/tecnicas.js');
@@ -15,7 +15,7 @@ const at = (day, hour, min = 0) => {
 
 const HOY = '2026-10-27';
 const MANANA = '2026-10-28';
-const CALLE_PREFIJO = 'Solo 3 tomas de prueba, no se publican · ';
+const CALLE_PREFIJO = 'Empieza por 3 tomas de prueba sin publicar · ';
 
 // Día 10 del test: 3 vídeos + métricas. Con 1 vídeo publicado (sin modo primer vídeo).
 function estado(patch = {}, place = 'casa', hora = '18:00', now = at(HOY, 10)) {
@@ -121,7 +121,7 @@ test('el texto de la repetición cuenta los vídeos que quedan y lleva el siguie
   s = completeMission(s, 'p1:video:2', at(HOY, 13));
   const r1 = deDia(planAvisos(s, at(HOY, 14), FRASES), HOY)[1];
   assert.strictEqual(r1.misionId, 'p1:video:3');
-  assert.ok(linea(r1, 1).startsWith('Te quedan 1 vídeo hoy · '));
+  assert.ok(linea(r1, 1).startsWith('Te queda 1 vídeo hoy · '));
 });
 
 test('tras completar todos los vídeos de hoy no queda aviso de hoy y siguen los de mañana', () => {
@@ -189,7 +189,7 @@ test('con hora 22:30 sale un solo aviso por día', () => {
   assert.deepStrictEqual(plan.map((a) => a.tipo), ['grabar', 'grabar']);
 });
 
-test('producto de calle: la línea 2 empieza por "Solo 3 tomas"', () => {
+test('producto de calle: la línea 2 empieza por "Empieza por 3 tomas"', () => {
   const plan = planAvisos(estado({}, 'calle'), at(HOY, 10), FRASES);
   assert.strictEqual(plan.length, 4);
   for (const a of plan) assert.ok(linea(a, 1).startsWith(CALLE_PREFIJO), linea(a, 1));
@@ -205,7 +205,7 @@ test('modo primer vídeo: la frase es de imperfecto o accion y la misión es el 
     assert.ok(['imperfecto', 'accion'].includes(q.categoria), q.categoria);
     assert.strictEqual(a.misionId, 'p1:primer:1');
   }
-  assert.ok(linea(plan[1], 1).startsWith('Te quedan 1 vídeo hoy · '));
+  assert.ok(linea(plan[1], 1).startsWith('Te queda 1 vídeo hoy · '));
 });
 
 test('usa extra: el texto coincide con la misión que ve la app (técnicas)', () => {
@@ -239,4 +239,35 @@ test('cambio de hora 25-10-2026: siguen a las 18:00 y 21:00 en hora local', () =
 test('activos false da []', () => {
   const s = configurarAvisos(estado(), false, '18:00');
   assert.deepStrictEqual(planAvisos(s, at(HOY, 10), FRASES), []);
+});
+
+test('el plan es el mismo antes y después de que la app elija la frase del día (hoy y mañana)', () => {
+  const s = estado();
+  const antes = planAvisos(s, at(HOY, 10), FRASES);
+  const elegida = pickDailyQuote(s, at(HOY, 10), FRASES);
+  assert.ok(elegida.quote.id);
+  assert.deepStrictEqual(planAvisos(elegida, at(HOY, 10), FRASES), antes);
+  // Ningún aviso repite la frase del día de su día.
+  const fraseHoy = FRASES.find((q) => q.id === elegida.quote.id).texto;
+  for (const a of deDia(antes, HOY)) assert.notStrictEqual(linea(a, 0), fraseHoy);
+  const manana = pickDailyQuote(rollDay(elegida, at(MANANA, 0, 1)), at(MANANA, 0, 1), FRASES);
+  const fraseManana = FRASES.find((q) => q.id === manana.quote.id).texto;
+  for (const a of deDia(antes, MANANA)) assert.notStrictEqual(linea(a, 0), fraseManana);
+});
+
+test('hora inválida o ausente en el estado: se usa 18:00', () => {
+  const ref = planAvisos(estado(), at(HOY, 10), FRASES).map((a) => a.id);
+  for (const mala of [null, 'abc', '25:99', undefined]) {
+    const s = estado();
+    s.avisos = { activos: true, hora: mala };
+    assert.deepStrictEqual(planAvisos(s, at(HOY, 10), FRASES).map((a) => a.id), ref, String(mala));
+    assert.strictEqual(normalizeState(JSON.parse(JSON.stringify(s))).avisos.hora, '18:00', String(mala));
+  }
+});
+
+test('hora 22:30 con racha: 22:00 racha y luego 22:30 grabar, en orden', () => {
+  const hoy = deDia(planAvisos(conRacha('22:30'), at(HOY, 10), FRASES), HOY);
+  assert.deepStrictEqual(hoy.map((a) => a.fecha), ['2026-10-27T22:00', '2026-10-27T22:30']);
+  assert.deepStrictEqual(hoy.map((a) => a.tipo), ['racha', 'grabar']);
+  assert.ok(!linea(hoy[1], 1).startsWith('Te qued'));
 });

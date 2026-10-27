@@ -85,6 +85,7 @@ function normalizeState(s) {
   if (s.tecnicasVistas === undefined) s.tecnicasVistas = d.tecnicasVistas;
   s.ganchos = s.ganchos || d.ganchos;
   s.avisos = Object.assign(d.avisos, s.avisos);
+  s.avisos.hora = horaValida(s.avisos.hora);
   s.today = Object.assign(d.today, s.today);
   for (const p of s.products || []) {
     if (p.discardedDay === undefined) p.discardedDay = null;
@@ -697,9 +698,13 @@ function skipQuote(quotes, now) {
 
 const AVISO_CATEGORIAS = ['verguenza', 'accion', 'imperfecto'];
 const AVISO_TITULO = 'Caballo Blanco';
-const AVISO_CALLE = 'Solo 3 tomas de prueba, no se publican · ';
+const AVISO_CALLE = 'Empieza por 3 tomas de prueba sin publicar · ';
 const AVISO_TOPE = 22 * 60;
 const HORA_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+function horaValida(hora) {
+  return typeof hora === 'string' && HORA_RE.test(hora) ? hora : '18:00';
+}
 
 function configurarAvisos(state, activos, hora) {
   const s = clone(state);
@@ -720,9 +725,11 @@ function horasAviso(hora) {
 function avisosDelDia(s, day, dayNow, now, quotes, extra, conRacha) {
   if (s.today.skipped || s.today.minimo) return [];
   const [y, mo, d] = day.split('-').map(Number);
-  const slots = horasAviso(s.avisos.hora);
+  const slots = horasAviso(horaValida(s.avisos.hora));
+  const primera = slots[0];
   const racha = conRacha && s.today.done.length === 0 ? streakNow(s, now) : 0;
   if (racha > 0 && !slots.includes(AVISO_TOPE)) slots.push(AVISO_TOPE);
+  slots.sort((a, b) => a - b);
   const videos = pendingMissions(s, dayNow, extra).filter((m) => m.kind === 'video' || m.kind === 'ensayo');
   const cats = primerVideoActivo(s, dayNow) ? ['imperfecto', 'accion'] : AVISO_CATEGORIAS;
   const pool = byId((quotes || []).filter((q) => cats.includes(q.categoria) && q.id !== s.quote.id));
@@ -739,21 +746,23 @@ function avisosDelDia(s, day, dayNow, now, quotes, extra, conRacha) {
     if (videos.length === 0) return;
     const m = videos[0];
     const n = videos.length;
-    let l2 = i === 0 ? m.text : 'Te quedan ' + n + (n === 1 ? ' vídeo' : ' vídeos') + ' hoy · ' + m.text;
+    const grabar = min === primera;
+    let l2 = grabar ? m.text : (n === 1 ? 'Te queda 1 vídeo hoy · ' : 'Te quedan ' + n + ' vídeos hoy · ') + m.text;
     if (findProduct(s, m.productId).place === 'calle') l2 = AVISO_CALLE + l2;
     const l1 = pool.length ? pool[(start + i) % pool.length].texto + '\n' : '';
-    out.push(Object.assign(base, { cuerpo: l1 + l2, misionId: m.id, tipo: i === 0 ? 'grabar' : 'repetir' }));
+    out.push(Object.assign(base, { cuerpo: l1 + l2, misionId: m.id, tipo: grabar ? 'grabar' : 'repetir' }));
   });
   return out;
 }
 
 function planAvisos(state, now, quotes, extra) {
   if (state.avisos && state.avisos.activos === false) return [];
-  const hoy = rollDay(normalizeState(clone(state)), now);
+  // La frase del día de cada día se calcula aquí (no se lee la guardada), así el plan es el mismo antes y después de que la app la elija.
+  const hoy = pickDailyQuote(rollDay(normalizeState(clone(state)), now), now, quotes, extra);
   const manana = addDays(dayKey(now), 1);
   const [y, m, d] = manana.split('-').map(Number);
   const mananaNow = new Date(y, m - 1, d, 0, 1);
-  const sManana = rollDay(hoy, mananaNow);
+  const sManana = pickDailyQuote(rollDay(hoy, mananaNow), mananaNow, quotes, extra);
   return avisosDelDia(hoy, dayKey(now), now, now, quotes, extra, true)
     .concat(avisosDelDia(sManana, manana, mananaNow, now, quotes, extra, false));
 }
