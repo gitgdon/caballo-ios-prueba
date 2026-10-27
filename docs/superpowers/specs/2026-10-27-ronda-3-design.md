@@ -160,6 +160,25 @@ La auditoría (riesgo de Kelbert: abandonar la primera semana) dejó 4 puntos ab
   - El banco se ve como una fila "Mis ganchos" en Más.
   - De vez en cuando, las misiones de vídeo proponen reutilizar uno: "· reutiliza tu gancho «…»".
 
+## 7. Calendario de dinero (como un calendario de trading)
+
+**Lo que decidió el usuario:**
+- cada día se colorea **por dinero**: verde si facturó y rojo cuando hay gastos, como las suscripciones que le cobran por mantener la tienda;
+- los gastos los **apunta él, uno a uno**, con un botón "Añadir gasto" en la hoja de "Apuntar facturación";
+- se ve desde una **fila "Calendario" en Más**.
+
+**Cómo funciona:**
+- **El mes:** se abre el mes actual y deslizando se ven los anteriores.
+- **Cada casilla:**
+  - verde si el neto del día es positivo, con el importe ("+260 €");
+  - rojo si es negativo ("−29 €");
+  - gris si no hay movimientos.
+- **Arriba:** el total del mes (facturación − gastos) y el número de días verdes y rojos.
+- **Al tocar un día:** se ve lo que entró y lo que salió.
+- **Facturación:** el usuario sigue apuntando el total de la tienda. El día recibe la diferencia con el total anterior. Si corrige el total a la baja, ese día recibe la diferencia negativa como ajuste.
+- **Gastos:** importe y concepto ("Shopify"), contados el día en que se apuntan. Se pueden borrar por si se apunta mal. *(mi decisión)*
+- **Relación con el reto:** los gastos **no restan** del reto de 10k. El reto mide facturación y el calendario muestra beneficio. *(mi decisión, el usuario la aceptó)*
+
 ---
 
 ## Qué se queda igual
