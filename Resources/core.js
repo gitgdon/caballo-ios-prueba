@@ -532,8 +532,14 @@ function retoDe(s, day) {
   return { meta: RETO_META, fin: RETO_FIN, inicio: day, base: totalVideos(s), facturado: 0, cumplido: false };
 }
 
+// Cantidad entera que Swift puede leer como Int: número finito, ≥ 0 y ≤ MAX_SAFE_INTEGER, redondeado; si no, null.
+function enteroValido(n) {
+  return typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= Number.MAX_SAFE_INTEGER ? Math.round(n) : null;
+}
+
 function retoValido(meta, fin) {
-  return typeof meta === 'number' && Number.isFinite(meta) && Math.round(meta) > 0 &&
+  const m = enteroValido(meta);
+  return m !== null && m > 0 &&
     typeof fin === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(fin) && addDays(fin, 0) === fin;
 }
 
@@ -554,9 +560,10 @@ function retoInfo(state, now) {
 
 function apuntarFacturacion(state, total, now) {
   const s = clone(state);
-  if (typeof total !== 'number' || !Number.isFinite(total) || total < 0) return s;
+  const t = enteroValido(total);
+  if (t === null) return s;
   if (!s.reto) s.reto = retoDe(s, dayKey(now));
-  s.reto.facturado = Math.round(total);
+  s.reto.facturado = t;
   if (!s.reto.cumplido && s.reto.facturado >= s.reto.meta) {
     s.reto.cumplido = true;
     ganarSecreta(s, 'reto-cumplido');
@@ -607,9 +614,10 @@ function faseDeVisitas(n) {
 function apuntarVisitas(state, productId, n, now) {
   const s = clone(state);
   const p = findProduct(s, productId);
-  if (!p || typeof n !== 'number' || !Number.isFinite(n) || n < 0) return s;
-  const f = faseDeVisitas(n);
-  p.visitas.push({ dia: dayKey(now), visitas: n, fase: f.fase });
+  const v = enteroValido(n);
+  if (!p || v === null) return s;
+  const f = faseDeVisitas(v);
+  p.visitas.push({ dia: dayKey(now), visitas: v, fase: f.fase });
   p.siguienteCambio = f.variante;
   return s;
 }
@@ -620,10 +628,11 @@ function pideGancho(n) {
 
 function guardarGancho(state, productId, texto, n, now) {
   const s = clone(state);
-  if (!findProduct(s, productId) || typeof n !== 'number' || !Number.isFinite(n)) return s;
+  const v = enteroValido(n);
+  if (!findProduct(s, productId) || v === null) return s;
   const t = Array.from(String(texto == null ? '' : texto).trim()).slice(0, 80).join('');
   if (!t) return s;
-  s.ganchos.push({ texto: t, producto: productId, visitas: n, dia: dayKey(now) });
+  s.ganchos.push({ texto: t, producto: productId, visitas: v, dia: dayKey(now) });
   return s;
 }
 

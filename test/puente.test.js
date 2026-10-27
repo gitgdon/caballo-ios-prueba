@@ -198,3 +198,59 @@ test('encuentro raro: el puente pasa las técnicas y encuentros (sale en pendien
   assert.ok(s.today.done.includes(raro.id));
   assert.strictEqual(s.xp, raro.xp);
 });
+
+test('visitas y gancho: decimales se redondean; 1e30 y negativos no se apuntan', () => {
+  const json = enTest('2026-10-25', 1);
+  const r = accion(json, 'visitas', ['p1', '6000.5']);
+  assert.strictEqual(r.fase.fase, 'cierre');
+  assert.strictEqual(estadoDe(r).products[0].visitas[0].visitas, 6001);
+  assert.strictEqual(vista(r.estado).productos[0].visitasMax, 6001);
+  for (const malo of ['1e30', '-3', 'abc']) {
+    const r2 = accion(r.estado, 'visitas', ['p1', malo]);
+    assert.strictEqual(r2.fase, null, malo);
+    assert.strictEqual(r2.pideGancho, false, malo);
+    assert.strictEqual(estadoDe(r2).products[0].visitas.length, 1, malo);
+  }
+  const g = accion(r.estado, 'gancho', ['p1', 'Mira', '6000.5']);
+  assert.strictEqual(vista(g.estado).ganchos[0].visitas, 6001);
+  for (const malo of ['1e30', '-3']) {
+    assert.deepStrictEqual(estadoDe(accion(r.estado, 'gancho', ['p1', 'Mira', malo])).ganchos, [], malo);
+  }
+});
+
+test('facturacion y reto: decimales se redondean; 1e30 y negativos no cambian nada', () => {
+  let json = accion(null, 'facturacion', ['2500.6']).estado;
+  assert.strictEqual(vista(json).reto.facturado, 2501);
+  for (const malo of ['1e30', '-3']) assert.strictEqual(vista(accion(json, 'facturacion', [malo]).estado).reto.facturado, 2501, malo);
+  json = accion(json, 'reto', ['15000.4', '2027-03-31']).estado;
+  assert.strictEqual(vista(json).reto.meta, 15000);
+  for (const malo of ['1e30', '-3']) {
+    assert.strictEqual(vista(accion(json, 'reto', [malo, '2027-03-31']).estado).reto.meta, 15000, malo);
+    assert.strictEqual(vista(accion(json, 'retoNuevo', [malo, '2027-03-31']).estado).reto.meta, 15000, malo);
+  }
+});
+
+test('vista: un estado guardado roto sigue dando enteros y nombres', () => {
+  const s = JSON.parse(enTest('2026-10-25', 1));
+  s.products[0].visitas = [{ dia: '2026-10-26', visitas: 6000.5, fase: 'cierre' }, { dia: '2026-10-26', visitas: 1e30, fase: 'x' }];
+  s.products[0].videos = 2.5;
+  s.ganchos = [{ texto: 'Mira', producto: 'p1', visitas: 1e30, dia: '2026-10-26' }, { texto: 'Otra', producto: 'p1', visitas: -3.2, dia: '2026-10-26' }];
+  s.reto = { meta: 10000.7, fin: '2026-12-31', inicio: '2026-10-01', base: 0, facturado: 1e30, cumplido: false };
+  s.xp = 15.5;
+  s.secretas = ['primer-video', 'de-una-version-futura'];
+  const v = vista(JSON.stringify(s));
+  const enteros = [
+    v.nivel, v.xp, v.xpSig, v.racha, v.escudos, v.tecnicasNuevas,
+    v.productos[0].visitasMax, v.productos[0].videos, v.productos[0].dia, v.productos[0].ganadores,
+    v.reto.meta, v.reto.facturado, v.reto.diasQuedan, v.reto.videos,
+    ...v.ganchos.map((g) => g.visitas), ...v.pendientes.map((m) => m.xp), ...v.tecnicas.map((t) => t.nivel),
+  ];
+  for (const n of enteros) assert.ok(Number.isSafeInteger(n), String(n));
+  assert.strictEqual(v.productos[0].visitasMax, Number.MAX_SAFE_INTEGER);
+  assert.strictEqual(v.ganchos[1].visitas, -3);
+  assert.ok(v.reto.progreso >= 0 && v.reto.progreso <= 1);
+  assert.deepStrictEqual(v.secretas, [
+    { id: 'primer-video', nombre: 'Primer vídeo' },
+    { id: 'de-una-version-futura', nombre: 'de-una-version-futura' },
+  ]);
+});

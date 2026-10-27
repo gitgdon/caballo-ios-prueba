@@ -9,6 +9,12 @@ function numeroPuente(x) {
   return typeof x === 'string' && x.trim() !== '' ? Number(x) : NaN;
 }
 
+// Lo que Swift lee como Int: siempre un entero seguro, aunque el estado guardado venga roto.
+function enteroPuente(x) {
+  if (typeof x !== 'number' || !Number.isFinite(x)) return 0;
+  return Math.round(Math.max(-Number.MAX_SAFE_INTEGER, Math.min(Number.MAX_SAFE_INTEGER, x)));
+}
+
 function preparar(json) {
   var now = new Date();
   return JSON.stringify(pickDailyQuote(rollDay(parseState(json), now), now, FRASES, EXTRA_PUENTE));
@@ -29,19 +35,19 @@ function vista(json) {
   var desbloqueadas = tecnicasDesbloqueadas(s, TECNICAS).length;
   var consejo = CONSEJOS[hashDay(hoy + ':consejo') % CONSEJOS.length];
   return JSON.stringify({
-    nivel: info.level, rango: info.rank, xp: info.xpInLevel, xpSig: info.xpForNext,
-    racha: streakNow(s, now), escudos: s.shields, humor: horseMood(s, now),
-    mision: m ? { id: m.id, texto: m.text, bloque: m.block, tipo: m.kind, xp: m.xp } : null,
+    nivel: enteroPuente(info.level), rango: info.rank, xp: enteroPuente(info.xpInLevel), xpSig: enteroPuente(info.xpForNext),
+    racha: enteroPuente(streakNow(s, now)), escudos: enteroPuente(s.shields), humor: horseMood(s, now),
+    mision: m ? { id: m.id, texto: m.text, bloque: m.block, tipo: m.kind, xp: enteroPuente(m.xp) } : null,
     frase: q ? { texto: q.texto, autor: q.autor, detalle: q.detalle || q.texto, video: q.video.titulo } : null,
     porque: whyToShow(s, now),
     producto: p ? {
-      n: Number(p.id.slice(1)), nombre: p.name,
-      dia: p.status === 'test' ? testDay(p, hoy) : 0,
-      ganadores: p.winners || 0, videos: p.videos || 0, bajon: inBajon(p, hoy),
+      n: enteroPuente(Number(p.id.slice(1))), nombre: p.name,
+      dia: p.status === 'test' ? enteroPuente(testDay(p, hoy)) : 0,
+      ganadores: enteroPuente(p.winners), videos: enteroPuente(p.videos), bajon: inBajon(p, hoy),
     } : null,
     hayProductos: activos.length > 0,
     pendientes: pendingMissions(s, now, EXTRA_PUENTE).filter(function (x) { return x.kind !== 'decision'; })
-      .map(function (x) { return { id: x.id, texto: x.text, bloque: x.block, tipo: x.kind, xp: x.xp }; }),
+      .map(function (x) { return { id: x.id, texto: x.text, bloque: x.block, tipo: x.kind, xp: enteroPuente(x.xp) }; }),
     decisiones: productsInDecision(s).map(ref),
     vendibles: activos.filter(function (x) { return x.status === 'test' || x.status === 'vendiendo'; }).map(ref),
     puedeMinimo: canStartMinimo(s, now, EXTRA_PUENTE),
@@ -54,22 +60,29 @@ function vista(json) {
     productos: s.products.map(function (x) {
       return {
         id: x.id, nombre: x.name, estado: x.status, lugar: x.place,
-        dia: x.status === 'test' ? testDay(x, hoy) : 0,
-        videos: x.videos || 0, ganadores: x.winners || 0,
+        dia: x.status === 'test' ? enteroPuente(testDay(x, hoy)) : 0,
+        videos: enteroPuente(x.videos), ganadores: enteroPuente(x.winners),
         copia: x.copia === true || x.copia === false ? x.copia : null,
-        visitasMax: x.visitas.reduce(function (n, v) { return Math.max(n, v.visitas); }, 0),
+        visitasMax: enteroPuente(x.visitas.reduce(function (n, v) { return Math.max(n, enteroPuente(v.visitas)); }, 0)),
         vendido: x.sold === true,
       };
     }),
-    medallas: s.medals || [],
-    reto: retoInfo(s, now),
+    medallas: (s.medals || []).map(enteroPuente),
+    reto: (function (r) {
+      r.meta = enteroPuente(r.meta); r.facturado = enteroPuente(r.facturado);
+      r.diasQuedan = enteroPuente(r.diasQuedan); r.videos = enteroPuente(r.videos);
+      r.progreso = Number.isFinite(r.progreso) ? Math.max(0, Math.min(1, r.progreso)) : 0;
+      return r;
+    })(retoInfo(s, now)),
     tecnicas: TECNICAS.slice().sort(function (a, b) { return a.nivel - b.nivel; }).map(function (t) {
       var abierta = t.nivel <= info.level;
-      return { id: t.id, nivel: t.nivel, titulo: t.titulo, texto: abierta ? t.texto : '', mision: abierta ? t.mision : '', desbloqueada: abierta };
+      return { id: t.id, nivel: enteroPuente(t.nivel), titulo: t.titulo, texto: abierta ? t.texto : '', mision: abierta ? t.mision : '', desbloqueada: abierta };
     }),
-    tecnicasNuevas: Math.max(0, desbloqueadas - s.tecnicasVistas),
-    secretas: s.secretas.map(function (id) { return { id: id, nombre: SECRETAS[id] }; }),
-    ganchos: s.ganchos,
+    tecnicasNuevas: Math.max(0, enteroPuente(desbloqueadas - s.tecnicasVistas)),
+    secretas: s.secretas.map(function (id) { return { id: String(id), nombre: SECRETAS[id] || String(id) }; }),
+    ganchos: s.ganchos.map(function (g) {
+      return { texto: String(g.texto), producto: String(g.producto), visitas: enteroPuente(g.visitas), dia: String(g.dia) };
+    }),
     avisos: { activos: s.avisos.activos, hora: s.avisos.hora },
     primerVideo: primerVideoActivo(s, now),
     consejo: { texto: consejo.texto, autor: consejo.autor },
@@ -115,9 +128,9 @@ function accion(json, nombre, argsJson) {
     case 'reto': s = editarReto(s, numeroPuente(a[0]), a[1]); break;
     case 'retoNuevo': s = nuevoReto(s, numeroPuente(a[0]), a[1], now); break;
     case 'visitas': {
-      var n = numeroPuente(a[1]);
+      var n = enteroValido(numeroPuente(a[1]));
       s = apuntarVisitas(s, a[0], n, now);
-      if (s.products.some(function (x) { return x.id === a[0]; }) && Number.isFinite(n) && n >= 0) {
+      if (s.products.some(function (x) { return x.id === a[0]; }) && n !== null) {
         var f = faseDeVisitas(n);
         fase = { fase: f.fase, donde: f.donde, cambio: f.cambio };
         gancho = pideGancho(n);
