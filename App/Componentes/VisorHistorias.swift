@@ -22,12 +22,15 @@ struct BotonPagina {
 /// Visor a pantalla completa. Sin avance automático.
 struct VisorHistorias: View {
     let paginas: [PaginaHistoria]
+    /// Se llama con el id de cada página que se enseña (también la primera).
+    let alMostrar: ((String) -> Void)?
     @State private var indice: Int
     @Environment(\.dismiss) private var cerrar
     @Environment(\.colorScheme) private var esquema
 
-    init(paginas: [PaginaHistoria], inicio: Int) {
+    init(paginas: [PaginaHistoria], inicio: Int, alMostrar: ((String) -> Void)? = nil) {
         self.paginas = paginas
+        self.alMostrar = alMostrar
         _indice = State(initialValue: max(0, min(inicio, max(paginas.count - 1, 0))))
     }
 
@@ -68,6 +71,9 @@ struct VisorHistorias: View {
             }
             .padding(.horizontal, Espacio.l)
             .padding(.top, Espacio.s)
+        }
+        .onChange(of: indice, initial: true) { _, nuevo in
+            if paginas.indices.contains(nuevo) { alMostrar?(paginas[nuevo].id) }
         }
         .simultaneousGesture(
             DragGesture(minimumDistance: 20).onEnded { valor in

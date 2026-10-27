@@ -235,6 +235,8 @@ private struct SeccionReto: View {
         return Int(v.rounded())
     }
 
+    private var metaGuardable: Bool { metaNueva != nil && metaNueva != reto.meta }
+
     private var fin: Binding<Date> {
         Binding(get: { Self.formatoDia.date(from: reto.fin) ?? .now },
                 set: { modelo.hacer("reto", [String(reto.meta), Self.formatoDia.string(from: $0)]) })
@@ -256,11 +258,11 @@ private struct SeccionReto: View {
         Section {
             campoMeta
             Button("Guardar meta", action: guardarMeta)
-                .foregroundStyle(Tema.acento)
+                .foregroundStyle(metaGuardable ? Tema.acento : Tema.textoSuave)
                 .frame(minHeight: 44)
-                .disabled(metaNueva == nil || metaNueva == reto.meta)
+                .disabled(!metaGuardable)
                 .accessibilityLabel("Guardar la meta del reto")
-            DatePicker("Fecha", selection: fin, displayedComponents: .date)
+            DatePicker("Fecha", selection: fin, in: Calendar.current.startOfDay(for: .now)..., displayedComponents: .date)
                 .tint(Tema.acento)
                 .foregroundStyle(Tema.texto)
                 .frame(minHeight: 44)

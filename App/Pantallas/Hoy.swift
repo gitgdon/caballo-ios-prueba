@@ -180,10 +180,11 @@ private struct FilaHistorias: View {
         .fullScreenCover(item: $visor) { abierto in
             // La página del reto se recalcula para enseñar lo recién apuntado.
             VisorHistorias(paginas: abierto.paginas.map { $0.id == "reto" ? paginaReto : $0 },
-                           inicio: abierto.inicio)
+                           inicio: abierto.inicio,
+                           alMostrar: mostrada)
                 .sheet(isPresented: $hojaFacturacion) {
                     HojaFacturacion(modelo: modelo)
-                        .presentationDetents([.medium])
+                        .presentationDetents([.medium, .large])
                         .presentationBackground(Tema.fondo)
                 }
                 .avisoLogro(texto: $modelo.aviso)
@@ -203,7 +204,14 @@ private struct FilaHistorias: View {
             if let m = medallaNueva { medallaVista = m }
             secretasVistas = vista.secretas.count
         }
-        if t == .tecnica { modelo.hacer("tecnicaVista") }
+    }
+
+    /// Ver la página de la técnica (al abrirla o pasando de otra historia) la marca como vista.
+    private func mostrada(_ id: String) {
+        if id == "tecnica", (modelo.vista?.tecnicasNuevas ?? 0) > 0 {
+            marcarVista(.tecnica)
+            modelo.hacer("tecnicaVista")
+        }
     }
 
     // MARK: Círculos
@@ -389,9 +397,9 @@ private struct FilaHistorias: View {
         } else if r.vencido {
             plazo = "El plazo acabó el \(Self.diaCorto(r.fin)). Puedes empezar otro en Más"
         } else if r.diasQuedan == 1 {
-            plazo = "Queda 1 día, hasta el \(Self.diaCorto(r.fin))"
+            plazo = "Queda 1 día hasta el \(Self.diaCorto(r.fin))"
         } else {
-            plazo = "Quedan \(r.diasQuedan) días, hasta el \(Self.diaCorto(r.fin))"
+            plazo = "Quedan \(r.diasQuedan) días hasta el \(Self.diaCorto(r.fin))"
         }
         let boton = BotonPagina(titulo: "Apuntar facturación", etiqueta: "Apuntar facturación") {
             hojaFacturacion = true
