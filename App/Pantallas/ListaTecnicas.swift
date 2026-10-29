@@ -6,12 +6,17 @@ struct ListaTecnicas: View {
     @ObservedObject var modelo: Modelo
     @State private var edicion: Edicion?
     @State private var porBorrar: Borrado?
+    /// Se guarda aparte para que el título no se vacíe mientras se cierra el diálogo.
+    @State private var tituloBorrar = ""
 
     var body: some View {
         List {
             if let v = modelo.vista {
                 seccionTecnicas(v)
-                SeccionMisTecnicas(vista: v, editar: { edicion = $0 }, borrar: { porBorrar = $0 })
+                SeccionMisTecnicas(vista: v, editar: { edicion = $0 }, borrar: { b in
+                    tituloBorrar = b.titulo
+                    porBorrar = b
+                })
             }
         }
         .listStyle(.insetGrouped)
@@ -27,7 +32,7 @@ struct ListaTecnicas: View {
             .presentationBackground(Tema.fondo)
             .apariencia()
         }
-        .confirmationDialog(porBorrar?.titulo ?? "", isPresented: Binding(
+        .confirmationDialog(tituloBorrar, isPresented: Binding(
             get: { porBorrar != nil },
             set: { if !$0 { porBorrar = nil } }
         ), titleVisibility: .visible, presenting: porBorrar) { b in

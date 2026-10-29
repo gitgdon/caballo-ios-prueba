@@ -133,7 +133,7 @@ final class Modelo: ObservableObject {
     }
 
     /// Al abrir la app: si lo último vino del widget o de un aviso hace menos de 10 minutos, se ofrece deshacerlo.
-    /// Si ya no hay nada que deshacer, la píldora se quita.
+    /// Si ya no hay nada que deshacer, o la píldora habla de otra acción, se quita.
     private func revisarDeshacer() {
         guard let d = juego.deshacible() else {
             pildora = nil
@@ -141,7 +141,9 @@ final class Modelo: ObservableObject {
         }
         if d.origen != "app", d != ofrecidaFuera, Date().timeIntervalSince(d.hora) < 600 {
             ofrecidaFuera = d
-            pildora = AvisoDeshacer(texto: Juego.etiqueta(d))
+            pildora = AvisoDeshacer(para: d)
+        } else if pildora?.para != d {
+            pildora = nil
         }
     }
 
@@ -186,9 +188,10 @@ final class Modelo: ObservableObject {
             if !mensajes.isEmpty { aviso = mensajes.joined(separator: "\n") }
         }
         vista = juego.vista()
-        if deshacible, let d = juego.deshacible(), d != previa {
-            pildora = AvisoDeshacer(texto: Juego.etiqueta(d))
-        } else if pildora != nil, juego.deshacible() == nil {
+        let actual = juego.deshacible()
+        if deshacible, let d = actual, d != previa {
+            pildora = AvisoDeshacer(para: d)
+        } else if pildora != nil, pildora?.para != actual {
             pildora = nil
         }
         actualizarFuera()

@@ -9,6 +9,8 @@ struct Productos: View {
     @State private var renombrando: Vista.ProductoFila?
     @State private var nombreNuevo = ""
     @State private var porBorrar: Vista.ProductoFila?
+    /// Se guarda aparte para que el título no se vacíe mientras se cierra el diálogo.
+    @State private var tituloBorrar = ""
 
     var body: some View {
         NavigationStack {
@@ -54,7 +56,7 @@ struct Productos: View {
             Button("Guardar") { guardarNombre(p) }
             Button("Cancelar", role: .cancel) { renombrando = nil }
         }
-        .confirmationDialog("¿Borrar «\(porBorrar?.nombre ?? "")»?", isPresented: Binding(
+        .confirmationDialog(tituloBorrar, isPresented: Binding(
             get: { porBorrar != nil },
             set: { if !$0 { porBorrar = nil } }
         ), titleVisibility: .visible, presenting: porBorrar) { p in
@@ -97,13 +99,18 @@ struct Productos: View {
     private func fila(_ p: Vista.ProductoFila, vendible: Bool) -> some View {
         Menu {
             if vendible { accionesJuego(p) }
-            Button("✏️ Renombrar") {
+            Button {
                 nombreNuevo = p.nombre
                 renombrando = p
+            } label: {
+                Label("Renombrar", systemImage: "pencil")
             }
-            .accessibilityLabel("Renombrar")
-            Button("🗑️ Borrar", role: .destructive) { porBorrar = p }
-                .accessibilityLabel("Borrar")
+            Button(role: .destructive) {
+                tituloBorrar = "¿Borrar «\(p.nombre)»?"
+                porBorrar = p
+            } label: {
+                Label("Borrar", systemImage: "trash")
+            }
         } label: {
             FilaProducto(producto: p)
         }
@@ -114,18 +121,24 @@ struct Productos: View {
 
     @ViewBuilder
     private func accionesJuego(_ p: Vista.ProductoFila) -> some View {
-        Button("🟢 Un vídeo ha funcionado") { modelo.hacer("ganador", [p.id]) }
-            .accessibilityLabel("Un vídeo ha funcionado")
-        Button("🔥 10k en TikTok") { modelo.hacer("viral", [p.id, "tiktok"]) }
-            .accessibilityLabel("10k en TikTok")
-        Button("🔥 10k en Instagram") { modelo.hacer("viral", [p.id, "instagram"]) }
-            .accessibilityLabel("10k en Instagram")
-        Button("🔥 10k en YouTube Shorts") { modelo.hacer("viral", [p.id, "youtube"]) }
-            .accessibilityLabel("10k en YouTube Shorts")
-        Button("💰 He vendido") { modelo.hacer("vendido", [p.id]) }
-            .accessibilityLabel("He vendido")
-        Button("📈 Apuntar visitas") { visitasPara = Vista.Ref(id: p.id, nombre: p.nombre) }
-            .accessibilityLabel("Apuntar visitas")
+        Button { modelo.hacer("ganador", [p.id]) } label: {
+            Label("Un vídeo ha funcionado", systemImage: "checkmark.circle")
+        }
+        Button { modelo.hacer("viral", [p.id, "tiktok"]) } label: {
+            Label("10k en TikTok", systemImage: "flame")
+        }
+        Button { modelo.hacer("viral", [p.id, "instagram"]) } label: {
+            Label("10k en Instagram", systemImage: "flame")
+        }
+        Button { modelo.hacer("viral", [p.id, "youtube"]) } label: {
+            Label("10k en YouTube Shorts", systemImage: "flame")
+        }
+        Button { modelo.hacer("vendido", [p.id]) } label: {
+            Label("He vendido", systemImage: "eurosign.circle")
+        }
+        Button { visitasPara = Vista.Ref(id: p.id, nombre: p.nombre) } label: {
+            Label("Apuntar visitas", systemImage: "chart.line.uptrend.xyaxis")
+        }
     }
 
     /// Los activos (test, vendiendo) primero, luego decisión y preparación; sin descartados.

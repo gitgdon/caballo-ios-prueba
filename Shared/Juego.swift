@@ -294,7 +294,7 @@ final class Juego {
         if esDeshacible {
             if r.estado != antes {
                 guardarCopia(CopiaDeshacer(antes: antes, despues: r.estado, nombre: nombre, origen: origen,
-                                           hora: Self.iso.string(from: Date())))
+                                           hora: Self.isoFino.string(from: Date())))
             }
         } else if let c = previa, c.despues == antes, r.estado != antes {
             // La acción que no se deshace se aplica también a `antes`, para que deshacer no la pierda ni se pierda.
@@ -310,6 +310,17 @@ final class Juego {
     }
 
     private static let iso = ISO8601DateFormatter()
+    /// Con milisegundos, para que dos acciones en el mismo segundo den copias distintas.
+    private static let isoFino: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+
+    /// Lee la hora con o sin milisegundos (las copias guardadas antes no los llevan).
+    private static func leerHora(_ texto: String) -> Date? {
+        isoFino.date(from: texto) ?? iso.date(from: texto)
+    }
 
     /// Acciones que ofrecen deshacer.
     static let deshacibles: Set<String> = [
@@ -321,7 +332,7 @@ final class Juego {
     /// La última acción, solo si el estado guardado sigue siendo el de justo después; si no, se olvida.
     func deshacible() -> Deshacer? {
         guard let c = copia() else { return nil }
-        guard estado == c.despues, let hora = Self.iso.date(from: c.hora) else {
+        guard estado == c.despues, let hora = Self.leerHora(c.hora) else {
             guardarCopia(nil)
             return nil
         }
@@ -333,7 +344,7 @@ final class Juego {
     @discardableResult
     func deshacer() -> Bool {
         guard let c = copia() else { return false }
-        guard estado == c.despues, Self.iso.date(from: c.hora) != nil else {
+        guard estado == c.despues, Self.leerHora(c.hora) != nil else {
             guardarCopia(nil)
             return false
         }
