@@ -99,6 +99,10 @@ final class Modelo: ObservableObject {
     @Published var pestana: Pestana = .hoy
     /// Frase pedida desde un aviso (su id) o desde el icono ("azar"); la pantalla de Frases la abre y la vacía.
     @Published var fraseAbierta: String?
+    /// Las 477 frases agrupadas para la pantalla de Frases; se leen una sola vez.
+    private(set) lazy var catalogo = CatalogoFrases(juego.frases())
+    /// Ids que "Dame una frase" ha mostrado en esta sesión (los 5 últimos).
+    var frasesMostradas: [String] = []
 
     func refrescar() {
         let grupo = UserDefaults(suiteName: Juego.grupo)

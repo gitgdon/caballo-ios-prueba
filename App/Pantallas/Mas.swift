@@ -7,6 +7,7 @@ struct Mas: View {
     @ObservedObject var modelo: Modelo
     @State private var textoPorque = ""
     @State private var tarjetaActiva = Actividad.activada
+    @State private var enFrases = false
     @FocusState private var escribiendo: Bool
 
     private static let maximo = 80
@@ -17,8 +18,14 @@ struct Mas: View {
                 .scrollContentBackground(.hidden)
                 .background(Tema.fondo)
                 .navigationTitle("Más")
+                .navigationDestination(isPresented: $enFrases) { Frases(modelo: modelo) }
         }
-        .onAppear { if textoPorque.isEmpty { textoPorque = modelo.vista?.porqueGuardado ?? "" } }
+        .onAppear {
+            if textoPorque.isEmpty { textoPorque = modelo.vista?.porqueGuardado ?? "" }
+            if modelo.fraseAbierta != nil { enFrases = true }
+        }
+        // Un aviso de frase o la acción rápida "Dame una frase" abren Frases (que vacía fraseAbierta).
+        .onChange(of: modelo.fraseAbierta) { _, nueva in if nueva != nil { enFrases = true } }
     }
 
     private var lista: some View {
@@ -30,6 +37,7 @@ struct Mas: View {
             SeccionAvisos(modelo: modelo)
             if let r = modelo.vista?.reto { SeccionReto(modelo: modelo, reto: r) }
             seccionAjustes
+            SeccionFrasesAvisos(modelo: modelo)
             Section("Créditos") {
                 Text("Iconos: Phosphor Icons (MIT)")
                     .foregroundStyle(Tema.texto)
@@ -98,6 +106,16 @@ struct Mas: View {
 
     private func seccionBancos(_ v: Vista) -> some View {
         Section {
+            Button { enFrases = true } label: {
+                HStack {
+                    filaEnlace("Frases", detalle: v.favoritas.isEmpty ? nil : "\(v.favoritas.count) ★")
+                    Image(systemName: "chevron.right")
+                        .font(.footnote.weight(.semibold))
+                        .foregroundStyle(Tema.textoSuave)
+                        .accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel(v.favoritas.isEmpty ? "Frases" : "Frases, \(v.favoritas.count) favoritas")
             NavigationLink {
                 ListaTecnicas(tecnicas: v.tecnicas)
             } label: {
@@ -221,6 +239,117 @@ private struct SeccionAvisos: View {
     private func comprobarPermiso() async {
         let estado = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
         denegado = estado == .denied
+    }
+}
+
+/// Ajustes de los avisos de frases. Cada cambio manda la configuración entera a "frasesConfig".
+private struct SeccionFrasesAvisos: View {
+    @ObservedObject var modelo: Modelo
+    @Environment(\.scenePhase) private var fase
+    @State private var denegado = false
+
+    private var config: FrasesConfig { modelo.vista?.frasesConfig ?? .porDefecto }
+
+    private func guardar(_ cambiar: (inout [String: Any]) -> Void) {
+        let c = config
+        var d: [String: Any] = ["activos": c.activos, "cadaHoras": c.cadaHoras, "desde": c.desde,
+                                "hasta": c.hasta, "soloFavoritas": c.soloFavoritas, "sonido": c.sonido]
+        cambiar(&d)
+        guard let datos = try? JSONSerialization.data(withJSONObject: d),
+              let json = String(data: datos, encoding: .utf8) else { return }
+        modelo.hacer("frasesConfig", [json])
+    }
+
+    /// "HH:mm" → hoy a esa hora.
+    private static func fecha(_ hora: String) -> Date {
+        let partes = hora.split(separator: ":").compactMap { Int($0) }
+        let h = partes.count == 2 ? partes[0] : 10
+        let m = partes.count == 2 ? partes[1] : 0
+        return Calendar.current.date(bySettingHour: h, minute: m, second: 0, of: .now) ?? .now
+    }
+
+    private static func hora(_ fecha: Date) -> String {
+        let c = Calendar.current.dateComponents([.hour, .minute], from: fecha)
+        return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+    }
+
+    private func interruptor(_ clave: String, _ valor: Bool) -> Binding<Bool> {
+        Binding(get: { valor }, set: { nuevo in guardar { $0[clave] = nuevo } })
+    }
+
+    private var cada: Binding<Int> {
+        Binding(get: { config.cadaHoras }, set: { nuevo in guardar { $0["cadaHoras"] = nuevo } })
+    }
+
+    private func campoHora(_ clave: String, _ valor: String) -> Binding<Date> {
+        Binding(get: { Self.fecha(valor) }, set: { nueva in guardar { $0[clave] = Self.hora(nueva) } })
+    }
+
+    /// "Desde" siempre antes de "Hasta", con al menos un minuto entre los dos.
+    private var rangoDesde: ClosedRange<Date> {
+        let inicio = Calendar.current.startOfDay(for: .now)
+        return inicio...max(inicio, Self.fecha(config.hasta).addingTimeInterval(-60))
+    }
+
+    private var rangoHasta: ClosedRange<Date> {
+        let inicio = Calendar.current.startOfDay(for: .now)
+        let fin = Calendar.current.date(bySettingHour: 23, minute: 59, second: 0, of: .now) ?? inicio
+        return min(fin, Self.fecha(config.desde).addingTimeInterval(60))...fin
+    }
+
+    var body: some View {
+        let c = config
+        Section {
+            Toggle("Frases durante el día", isOn: interruptor("activos", c.activos))
+                .modifier(FilaAjuste())
+            Group {
+                Stepper("Cada \(c.cadaHoras) h", value: cada, in: 1...6)
+                    .accessibilityLabel("Cada \(c.cadaHoras) horas")
+                DatePicker("Desde", selection: campoHora("desde", c.desde), in: rangoDesde, displayedComponents: .hourAndMinute)
+                DatePicker("Hasta", selection: campoHora("hasta", c.hasta), in: rangoHasta, displayedComponents: .hourAndMinute)
+                Toggle(isOn: interruptor("soloFavoritas", c.soloFavoritas)) {
+                    VStack(alignment: .leading, spacing: Espacio.xs) {
+                        Text("Solo mis favoritas")
+                        Text("Necesitas al menos 3")
+                            .font(.footnote)
+                            .foregroundStyle(Tema.textoSuave)
+                    }
+                }
+                .accessibilityLabel("Solo mis favoritas. Necesitas al menos 3")
+                Toggle("Con sonido", isOn: interruptor("sonido", c.sonido))
+            }
+            .modifier(FilaAjuste())
+            .disabled(!c.activos)
+        } header: {
+            Text("Frases durante el día")
+        } footer: {
+            VStack(alignment: .leading, spacing: Espacio.xs) {
+                Text("Solo la frase, sin la misión. Nunca fuera de este horario.")
+                if denegado {
+                    Text("Actívalos en Ajustes de iOS → Caballo Blanco → Notificaciones")
+                }
+            }
+        }
+        .listRowBackground(Tema.superficie)
+        .task { await comprobarPermiso() }
+        .onChange(of: fase) { _, nueva in
+            if nueva == .active { Task { await comprobarPermiso() } }
+        }
+    }
+
+    private func comprobarPermiso() async {
+        let estado = await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+        denegado = estado == .denied
+    }
+}
+
+/// Fila de ajuste: tinte de acento, texto y 44 pt.
+private struct FilaAjuste: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .tint(Tema.acento)
+            .foregroundStyle(Tema.texto)
+            .frame(minHeight: 44)
     }
 }
 
