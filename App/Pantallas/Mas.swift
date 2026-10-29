@@ -1,13 +1,14 @@
 import SwiftUI
 import UserNotifications
 
-/// Pestaña Más: mi porqué, la frase de hoy, técnicas y ganchos, calendario de dinero, avisos, reto, ajustes y créditos,
+/// Pestaña Más: mi porqué, la frase de hoy, frases, técnicas (con mis técnicas y ganchos), calendario de dinero, avisos, reto, ajustes y créditos,
 /// al estilo de los Ajustes de iOS.
 struct Mas: View {
     @ObservedObject var modelo: Modelo
     @State private var textoPorque = ""
     @State private var tarjetaActiva = Actividad.activada
     @State private var enFrases = false
+    @AppStorage("apariencia") private var apariencia = "auto"
     @FocusState private var escribiendo: Bool
 
     private static let maximo = 80
@@ -117,17 +118,18 @@ struct Mas: View {
             }
             .accessibilityLabel(v.favoritas.isEmpty ? "Frases" : "Frases, \(v.favoritas.count) favoritas")
             NavigationLink {
-                ListaTecnicas(tecnicas: v.tecnicas)
+                ListaTecnicas(modelo: modelo)
             } label: {
-                filaEnlace("Técnicas", detalle: "\(v.tecnicas.filter(\.desbloqueada).count) de \(v.tecnicas.count)")
-            }
-            NavigationLink {
-                ListaGanchos(ganchos: v.ganchos, productos: v.productos)
-            } label: {
-                filaEnlace("Mis ganchos", detalle: v.ganchos.isEmpty ? nil : "\(v.ganchos.count)")
+                filaEnlace("Técnicas", detalle: misTecnicas(v))
             }
         }
         .listRowBackground(Tema.superficie)
+    }
+
+    /// Cuántas técnicas propias y ganchos hay guardados; nil si ninguno.
+    private func misTecnicas(_ v: Vista) -> String? {
+        let n = v.misTecnicas.count + v.ganchos.count
+        return n == 0 ? nil : "\(n)"
     }
 
     private var seccionCalendario: some View {
@@ -167,10 +169,21 @@ struct Mas: View {
             .tint(Tema.acento)
             .foregroundStyle(Tema.texto)
             .frame(minHeight: 44)
+            Picker("Apariencia", selection: $apariencia) {
+                Text("Automático").tag("auto")
+                Text("Claro").tag("claro")
+                Text("Oscuro").tag("oscuro")
+            }
+            .tint(Tema.acento)
+            .foregroundStyle(Tema.texto)
+            .frame(minHeight: 44)
         } header: {
             Text("Ajustes")
         } footer: {
-            Text("Incluye el 🐴 de la isla dinámica: iOS no deja mostrar una sin la otra.")
+            VStack(alignment: .leading, spacing: Espacio.xs) {
+                Text("Incluye el 🐴 de la isla dinámica: iOS no deja mostrar una sin la otra.")
+                Text("Los widgets y la tarjeta de bloqueo siguen el modo del iPhone.")
+            }
         }
         .listRowBackground(Tema.superficie)
     }

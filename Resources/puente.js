@@ -77,7 +77,8 @@ function vista(json) {
     ultimoTotal: enteroPuente(s.ultimoTotal),
     tecnicas: TECNICAS.slice().sort(function (a, b) { return a.nivel - b.nivel; }).map(function (t) {
       var abierta = t.nivel <= info.level;
-      return { id: t.id, nivel: enteroPuente(t.nivel), titulo: t.titulo, texto: abierta ? t.texto : '', mision: abierta ? t.mision : '', desbloqueada: abierta };
+      // Ronda 4: todas se pueden leer; `desbloqueada` dice solo si ya se practica (nivel alcanzado).
+      return { id: t.id, nivel: enteroPuente(t.nivel), titulo: t.titulo, texto: t.texto, mision: t.mision, desbloqueada: abierta };
     }),
     tecnicasNuevas: Math.max(0, enteroPuente(desbloqueadas - s.tecnicasVistas)),
     secretas: s.secretas.map(function (id) { return { id: String(id), nombre: SECRETAS[id] || String(id) }; }),

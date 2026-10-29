@@ -55,8 +55,8 @@ test('vista(null): reto, técnicas, avisos, primer vídeo y consejo por defecto'
   assert.ok(v.tecnicas[0].texto.length > 0 && v.tecnicas[0].mision.length > 0);
   for (const t of v.tecnicas.slice(1)) {
     assert.strictEqual(t.desbloqueada, false);
-    assert.strictEqual(t.texto, '');
-    assert.strictEqual(t.mision, '');
+    // Ronda 4: las técnicas se leen todas desde el primer día.
+    assert.ok(t.texto.length > 0 && t.mision.length > 0);
     assert.ok(t.titulo.length > 0);
   }
   assert.strictEqual(v.tecnicasNuevas, 1);

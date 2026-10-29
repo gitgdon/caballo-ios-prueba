@@ -24,12 +24,16 @@ struct Hoy: View {
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Tema.fondo)
                 .avisoLogro(texto: $modelo.aviso)
+                .pildoraDeshacer(modelo)
+                .apariencia()
         }
         .sheet(item: $visitasPara) { p in
             HojaVisitas(producto: p, modelo: modelo)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Tema.fondo)
                 .avisoLogro(texto: $modelo.aviso)
+                .pildoraDeshacer(modelo)
+                .apariencia()
         }
     }
 
@@ -206,8 +210,11 @@ private struct FilaHistorias: View {
                     HojaFacturacion(modelo: modelo)
                         .presentationDetents([.medium, .large])
                         .presentationBackground(Tema.fondo)
+                        .apariencia()
                 }
                 .avisoLogro(texto: $modelo.aviso)
+                .pildoraDeshacer(modelo)
+                .apariencia()
         }
     }
 

@@ -76,6 +76,8 @@ struct Calendario: View {
             HojaDia(modelo: modelo, clave: e.id)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Tema.fondo)
+                .pildoraDeshacer(modelo)
+                .apariencia()
         }
     }
 
@@ -206,13 +208,14 @@ private struct CasillaDia: View {
     }
 }
 
-/// Lo que entró y salió un día; los gastos se pueden borrar.
+/// Lo que entró y salió un día; los gastos se pueden editar (tocándolos) y borrar.
 private struct HojaDia: View {
     @ObservedObject var modelo: Modelo
     let clave: String
     @Environment(\.dismiss) private var cerrar
     /// Gasto pendiente de confirmar: solo el diálogo lo borra, así un doble toque no borra dos.
     @State private var porBorrar: CalendarioMes.Movimiento?
+    @State private var editando: CalendarioMes.Movimiento?
 
     private var dia: CalendarioMes.Dia? {
         modelo.calendario(mes: String(clave.prefix(7)))?.dias.first { $0.dia == clave }
@@ -223,7 +226,7 @@ private struct HojaDia: View {
             List {
                 if let d = dia, !d.movimientos.isEmpty {
                     ForEach(d.movimientos) { m in
-                        FilaMovimiento(movimiento: m) { porBorrar = m }
+                        FilaMovimiento(movimiento: m, editar: { editando = m }, borrar: { porBorrar = m })
                     }
                 } else {
                     Text("Este día no hay movimientos")
@@ -254,12 +257,98 @@ private struct HojaDia: View {
                         .accessibilityLabel("Cerrar")
                 }
             }
+            .sheet(item: $editando) { m in
+                HojaEditarGasto(movimiento: m) { valor, concepto in
+                    editando = nil
+                    modelo.hacer("editarGasto", [String(m.indice), String(valor), concepto])
+                }
+                .presentationDetents([.medium, .large])
+                .presentationBackground(Tema.fondo)
+                .apariencia()
+            }
         }
+    }
+}
+
+/// Cambiar importe y concepto de un gasto.
+private struct HojaEditarGasto: View {
+    let movimiento: CalendarioMes.Movimiento
+    let guardar: (Double, String) -> Void
+    @Environment(\.dismiss) private var cerrar
+    @State private var texto = ""
+    @State private var concepto = ""
+    @FocusState private var enfocado: Bool
+
+    private static let maximoConcepto = 40
+
+    /// Gasto mayor que 0 (el juego lo guarda a céntimos).
+    private var valor: Double? { importe(texto).flatMap { $0 >= 0.01 && $0 <= 9_007_199_254_740_991 ? $0 : nil } }
+
+    var body: some View {
+        NavigationStack {
+            VStack(alignment: .leading, spacing: Espacio.m) {
+                campoImporte
+                campoConcepto
+                Button("Guardar") { if let v = valor { guardar(v, concepto) } }
+                    .buttonStyle(.principal)
+                    .disabled(valor == nil)
+                    .accessibilityLabel("Guardar gasto")
+                Spacer(minLength: 0)
+            }
+            .padding(Espacio.l)
+            .background(Tema.fondo)
+            .navigationTitle("Editar gasto")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { cerrar() }
+                        .foregroundStyle(Tema.acento)
+                }
+            }
+        }
+        .onAppear {
+            texto = cantidad(movimiento.importe)
+            concepto = movimiento.concepto
+            enfocado = true
+        }
+    }
+
+    private var campoImporte: some View {
+        HStack(spacing: Espacio.s) {
+            TextField("0", text: $texto)
+                .keyboardType(.decimalPad)
+                .focused($enfocado)
+                .font(.title3.bold())
+                .foregroundStyle(Tema.texto)
+                .accessibilityLabel("Importe del gasto en euros")
+            Text("€")
+                .font(.title3.bold())
+                .foregroundStyle(Tema.textoSuave)
+                .accessibilityHidden(true)
+        }
+        .padding(.horizontal, Espacio.l)
+        .frame(minHeight: 52)
+        .background(Tema.superficie, in: RoundedRectangle(cornerRadius: Radio.md))
+        .overlay(RoundedRectangle(cornerRadius: Radio.md).stroke(Tema.bordeCampo, lineWidth: 1))
+    }
+
+    private var campoConcepto: some View {
+        TextField("Concepto (p. ej. Shopify)", text: $concepto)
+            .foregroundStyle(Tema.texto)
+            .padding(.horizontal, Espacio.l)
+            .frame(minHeight: 44)
+            .background(Tema.superficie, in: RoundedRectangle(cornerRadius: Radio.md))
+            .overlay(RoundedRectangle(cornerRadius: Radio.md).stroke(Tema.bordeCampo, lineWidth: 1))
+            .onChange(of: concepto) { _, nuevo in
+                if nuevo.unicodeScalars.count > Self.maximoConcepto { concepto = recortar(nuevo, Self.maximoConcepto) }
+            }
+            .accessibilityLabel("Concepto del gasto")
     }
 }
 
 private struct FilaMovimiento: View {
     let movimiento: CalendarioMes.Movimiento
+    let editar: () -> Void
     let borrar: () -> Void
 
     private var esGasto: Bool { movimiento.tipo == "gasto" }
@@ -267,12 +356,13 @@ private struct FilaMovimiento: View {
 
     var body: some View {
         HStack(spacing: Espacio.s) {
-            Text(movimiento.concepto)
-                .foregroundStyle(Tema.texto)
-            Spacer()
-            Text(conSigno(importe))
-                .font(.body.bold())
-                .foregroundStyle(importe < 0 ? Tema.peligro : Tema.exito)
+            if esGasto {
+                Button(action: editar) { datos }
+                    .buttonStyle(.plain)
+                    .accessibilityHint("Toca para editar el importe y el concepto")
+            } else {
+                datos
+            }
             if esGasto {
                 Button(action: borrar) {
                     Image(systemName: "trash").frame(width: 44, height: 44)
@@ -284,6 +374,19 @@ private struct FilaMovimiento: View {
         }
         .frame(minHeight: 44)
         .listRowBackground(Tema.superficie)
+    }
+
+    private var datos: some View {
+        HStack(spacing: Espacio.s) {
+            Text(movimiento.concepto)
+                .foregroundStyle(Tema.texto)
+            Spacer()
+            Text(conSigno(importe))
+                .font(.body.bold())
+                .foregroundStyle(importe < 0 ? Tema.peligro : Tema.exito)
+        }
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
     }
 }
 

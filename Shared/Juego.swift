@@ -140,7 +140,7 @@ struct Reto: Decodable {
     let diasQuedan: Int, vencido: Bool, videos: Int, cumplido: Bool
 }
 
-/// Técnica de nivel; `texto` y `mision` vienen vacíos mientras está bloqueada.
+/// Técnica de nivel; todas traen su texto. `desbloqueada`: su nivel ya se alcanzó (entra en las misiones).
 struct Tecnica: Decodable, Identifiable {
     let id: String, nivel: Int, titulo: String, texto: String, mision: String, desbloqueada: Bool
 }

@@ -110,6 +110,10 @@ final class Modelo: ObservableObject {
     private var catalogoLeido: CatalogoFrases?
     /// Ids que "Dame una frase" ha mostrado en esta sesión (los 5 últimos).
     var frasesMostradas: [String] = []
+    /// Píldora "<qué se hizo> · Deshacer" de abajo.
+    @Published var pildora: AvisoDeshacer?
+    /// Última acción del widget o de un aviso que ya se ofreció deshacer, para no repetir la píldora.
+    private var ofrecidaFuera: Deshacer?
 
     func refrescar() {
         let grupo = UserDefaults(suiteName: Juego.grupo)
@@ -124,7 +128,29 @@ final class Modelo: ObservableObject {
             aviso = texto
             vista = juego.vista()
         }
+        revisarDeshacer()
         actualizarFuera()
+    }
+
+    /// Al abrir la app: si lo último vino del widget o de un aviso hace menos de 10 minutos, se ofrece deshacerlo.
+    /// Si ya no hay nada que deshacer, la píldora se quita.
+    private func revisarDeshacer() {
+        guard let d = juego.deshacible() else {
+            pildora = nil
+            return
+        }
+        if d.origen != "app", d != ofrecidaFuera, Date().timeIntervalSince(d.hora) < 600 {
+            ofrecidaFuera = d
+            pildora = AvisoDeshacer(texto: Juego.etiqueta(d))
+        }
+    }
+
+    /// "Deshacer" de la píldora: vuelve al estado de antes y recarga todo (widgets, tarjeta y los dos planes de avisos).
+    /// `refrescar()` llama a `preparar()`, que crea la partida si antes no había ninguna.
+    func deshacerUltimo() {
+        pildora = nil
+        juego.deshacer()
+        refrescar()
     }
 
     /// Widgets y tarjeta de la pantalla de bloqueo.
@@ -150,7 +176,9 @@ final class Modelo: ObservableObject {
     /// Como `hacer`, pero devuelve el resultado (la fase y el gancho de "visitas").
     @discardableResult
     func hacerConResultado(_ nombre: String, _ args: [String] = []) -> Resultado? {
-        let r = juego.accion(nombre, args)
+        let deshacible = Juego.deshacibles.contains(nombre)
+        let previa = deshacible ? juego.deshacible() : nil
+        let r = juego.accion(nombre, args, origen: "app")
         if let r {
             var mensajes = r.logros
             if let g = r.ganador { mensajes.insert(g, at: 0) }
@@ -158,6 +186,11 @@ final class Modelo: ObservableObject {
             if !mensajes.isEmpty { aviso = mensajes.joined(separator: "\n") }
         }
         vista = juego.vista()
+        if deshacible, let d = juego.deshacible(), d != previa {
+            pildora = AvisoDeshacer(texto: Juego.etiqueta(d))
+        } else if pildora != nil, juego.deshacible() == nil {
+            pildora = nil
+        }
         actualizarFuera()
         return r
     }
@@ -219,11 +252,31 @@ struct Raiz: View {
             .presentationDetents([.medium, .large])
             .presentationBackground(Tema.fondo)
             .avisoLogro(texto: $modelo.aviso)
+            .pildoraDeshacer(modelo)
+            .apariencia()
         }
         .confirmationDialog("¿Empezar otro producto en paralelo?", isPresented: $modelo.ofrecerParalelo, titleVisibility: .visible) {
             Button("Sí") { hojaNuevo = true }
             Button("No", role: .cancel) {}
         }
         .avisoLogro(texto: $modelo.aviso)
+        .pildoraDeshacer(modelo, sobreBarra: true)
+        .apariencia()
+    }
+}
+
+/// Modo claro u oscuro elegido en Más → Ajustes ("auto" sigue al iPhone). Va en `Raiz` y en cada hoja,
+/// porque las hojas no siempre heredan `preferredColorScheme`.
+private struct ModificadorApariencia: ViewModifier {
+    @AppStorage("apariencia") private var apariencia = "auto"
+
+    func body(content: Content) -> some View {
+        content.preferredColorScheme(apariencia == "claro" ? .light : apariencia == "oscuro" ? .dark : nil)
+    }
+}
+
+extension View {
+    func apariencia() -> some View {
+        modifier(ModificadorApariencia())
     }
 }
