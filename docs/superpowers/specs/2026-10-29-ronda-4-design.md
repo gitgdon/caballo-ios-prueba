@@ -114,6 +114,37 @@ Detectó además que un producto creado sin querer no se puede borrar, y pidió:
 
 ---
 
+## Detalles resueltos tras la revisión *(todas son decisiones mías)*
+
+1. **Frases de dinero fuera de los avisos y de "Dame una frase":**
+   - Muchas frases de `accion`, `disciplina`, `imperfecto` y `verguenza` hablan de dinero, así que además de la categoría se aplica una regla de palabras sobre el `texto`, no sobre el `detalle`. Se excluyen las que contienen €, euro, dinero, millón, millonario, rico, factur, ganar o sueldo (sin mayúsculas ni acentos).
+   - La lista vive en `core.js`, porque `frases.js` no se toca.
+   - La lista completa del apartado Frases sí las muestra todas.
+   - Los avisos de misión mantienen sus categorías actuales.
+2. **Borrar un producto:**
+   - se borra el producto;
+   - `productsStarted` no baja, para que los ids nunca se repitan, y un contador `productosBorrados` resta para el "Producto N/30";
+   - la base de vídeos del reto baja en los vídeos de ese producto (nunca por debajo de 0), y `retoInfo.videos` nunca es negativo;
+   - medallas, secretas, escalón de calle y XP ya ganados se quedan;
+   - si los vídeos totales vuelven a 0, "Tu primer vídeo" vuelve a activarse, que es lo correcto si el producto era un error;
+   - los ganchos de ese producto se quedan, porque son aprendizaje del usuario;
+   - las misiones de ese producto desaparecen de hoy.
+3. **"Mis técnicas" son notas.** No entran en las misiones ni en las historias. "Ganchos del banco" es el `s.ganchos` actual: editarlos o borrarlos cambia también la reutilización de ganchos en las misiones.
+4. **Deshacer:**
+   - **Con píldora:** solo las acciones del usuario que cambian el juego. Son hecho, minimo, saltar, ganador, viral, vendido, nuevo, decidir, facturacion, gasto, borrarMovimiento, editar gasto, visitas, gancho, editar o borrar ganchos y técnicas propias, renombrar o borrar producto, reto y retoNuevo.
+   - **Sin píldora:** bajonVisto, tecnicaVista, avisosConfig, porque, favoritas, ajustes de frases y apariencia.
+   - Cada paso se deshace por separado: deshacer el gancho deja las visitas apuntadas.
+   - **Cuándo deja de ofrecerse:** se guarda el estado de antes y el de justo después. Si el estado guardado ya no es el de justo después (por ejemplo, porque `preparar` cambió el día o el widget marcó algo), deshacer no se ofrece.
+   - La píldora va abajo y los avisos de logro arriba, así que conviven.
+5. **Apariencia:** Claro y Oscuro son las paletas actuales de `Tema`. Se guarda con `@AppStorage` en el `UserDefaults` normal, porque los widgets no la usan. Se aplica también a hojas y `fullScreenCover`.
+6. **Horario de los avisos de frases:**
+   - "Hasta" es inclusivo;
+   - el usuario puede elegir cualquier franja, así que "madrugada" significa fuera de la que elija;
+   - las frases también son distintas de las que ya llevan los avisos de misión ese día;
+   - si se pasa del tope de 60, se quitan primero las de mañana, empezando por las más tardías;
+   - los dos planes se programan en la misma llamada, para que ninguno borre los avisos del otro.
+7. **Tocar un aviso de frase:** la app abre la pestaña Más en Frases con esa frase destacada, también si la app estaba cerrada. Se hace con un estado de navegación publicado en `Modelo`.
+
 ## Qué se queda igual
 - Las misiones y los avisos de misión, la racha, los escudos, el reto, el calendario y "Tu primer vídeo".
 - Los encuentros, las medallas, los widgets, la tarjeta de bloqueo y la isla dinámica.
