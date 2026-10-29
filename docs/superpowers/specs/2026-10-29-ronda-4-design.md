@@ -145,6 +145,20 @@ Detectó además que un producto creado sin querer no se puede borrar, y pidió:
    - los dos planes se programan en la misma llamada, para que ninguno borre los avisos del otro.
 7. **Tocar un aviso de frase:** la app abre la pestaña Más en Frases con esa frase destacada, también si la app estaba cerrada. Se hace con un estado de navegación publicado en `Modelo`.
 
+## Segunda vuelta (aprobada por el usuario)
+
+Sustituye lo que diga lo anterior donde haya conflicto.
+
+1. **Deshacer también lo hecho desde el widget o el aviso.**
+   - Las acciones del widget (✅) y de la notificación ("Hecho") también guardan la copia para deshacer, en el App Group, con su origen y su hora.
+   - Al abrir la app, si la última acción vino de fuera y hace menos de 10 minutos, sale la píldora "Misión hecha desde el widget · Deshacer" (o "…desde el aviso").
+   - Se sigue aplicando la regla de no pisar cambios: solo se ofrece si el estado guardado sigue siendo el de justo después de esa acción.
+2. **Sin saturar de avisos.** Un aviso de frase se salta si cae a menos de 45 minutos de un aviso de misión, antes o después. Sustituye a la regla de "misma hora y minuto".
+3. **"Te llegaron hoy"** arriba del apartado Frases: las frases de los avisos de frases que ya han salido hoy, con la más reciente primero.
+   - Como iOS no avisa a la app cuando entrega una notificación, la lista se calcula a partir del plan del día: las que tenían hora anterior a ahora. *(mi decisión)*
+4. **"Dame una frase" desde el icono.** Es una acción rápida del icono de la app (mantener pulsado), que abre directamente el apartado Frases con una frase al azar ya mostrada.
+5. **Avisos de frases sin sonido por defecto.** Aparecen en pantalla igual, pero no suenan. En Ajustes → "Frases durante el día" hay un interruptor "Con sonido", apagado por defecto. Los avisos de misión siguen sonando.
+
 ## Qué se queda igual
 - Las misiones y los avisos de misión, la racha, los escudos, el reto, el calendario y "Tu primer vídeo".
 - Los encuentros, las medallas, los widgets, la tarjeta de bloqueo y la isla dinámica.
