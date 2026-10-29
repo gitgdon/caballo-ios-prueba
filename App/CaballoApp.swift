@@ -20,7 +20,6 @@ final class DelegadoApp: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Avisos.registrarCategoria()
         UNUserNotificationCenter.current().delegate = avisos
-        if let atajo = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem { _ = abrirFraseDesdeAtajo(atajo) }
         return true
     }
 
@@ -29,10 +28,6 @@ final class DelegadoApp: NSObject, UIApplicationDelegate {
         let configuracion = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
         configuracion.delegateClass = DelegadoEscena.self
         return configuracion
-    }
-
-    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
-        completionHandler(abrirFraseDesdeAtajo(shortcutItem))
     }
 }
 
@@ -110,10 +105,18 @@ final class Modelo: ObservableObject {
     private var catalogoLeido: CatalogoFrases?
     /// Ids que "Dame una frase" ha mostrado en esta sesión (los 5 últimos).
     var frasesMostradas: [String] = []
-    /// Píldora "<qué se hizo> · Deshacer" de abajo.
-    @Published var pildora: AvisoDeshacer?
+    /// Píldora "<qué se hizo> · Deshacer" de abajo. VoiceOver la anuncia una vez aquí, no en cada vista que la enseña.
+    @Published var pildora: AvisoDeshacer? {
+        didSet {
+            if let p = pildora, p.id != oldValue?.id {
+                AccessibilityNotification.Announcement("\(p.texto). Deshacer disponible").post()
+            }
+        }
+    }
     /// Última acción del widget o de un aviso que ya se ofreció deshacer, para no repetir la píldora.
     private var ofrecidaFuera: Deshacer?
+    /// Última reprogramación de avisos; cada una espera a la anterior para que no se borren los avisos entre sí.
+    private var reprogramacion: Task<Void, Never>?
 
     func refrescar() {
         let grupo = UserDefaults(suiteName: Juego.grupo)
@@ -160,12 +163,20 @@ final class Modelo: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         let v = vista
         Task { await Actividad.actualizar(v) }
-        Task { await reprogramarAvisos() }
+        reprogramarAvisos()
     }
 
-    /// Avisos de misiones y de frases de hoy y mañana.
+    /// Avisos de misiones y de frases de hoy y mañana, en fila: si hay una reprogramación en marcha, se espera a que acabe.
+    func reprogramarAvisos() {
+        let previa = reprogramacion
+        reprogramacion = Task {
+            await previa?.value
+            await planificarAvisos()
+        }
+    }
+
     /// El plan se lee en el hilo principal: el JSContext de `juego` no se comparte entre tareas.
-    func reprogramarAvisos() async {
+    private func planificarAvisos() async {
         let plan = juego.avisos() + juego.avisosFrases()
         let sonido = vista?.frasesConfig.sonido ?? false
         await Avisos.reprogramar(plan, sonidoFrases: sonido)
@@ -237,7 +248,7 @@ struct Raiz: View {
         .onAppear { modelo.refrescar() }
         .task {
             await Avisos.pedirPermisoSiHaceFalta()
-            await modelo.reprogramarAvisos()
+            modelo.reprogramarAvisos()
         }
         .onChange(of: fase) { _, nueva in if nueva == .active { modelo.refrescar() } }
         // "Hecho" desde la notificación o el widget con la app abierta.

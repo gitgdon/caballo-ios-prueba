@@ -50,11 +50,9 @@ struct Vista: Decodable {
     let favoritas: [String]
     let frasesConfig: FrasesConfig
     let misTecnicas: [MiTecnica]
-    /// Todos los ids de frase, en el orden de FRASES.
-    let fraseIds: [String]
     /// Avisos de frase que ya salieron hoy, el más reciente primero.
     let enviadasHoy: [FraseEnviada]
-    /// Ids para "Dame una frase" (categorías que empujan, sin dinero; o las favoritas).
+    /// Ids para "Dame una frase" (las 4 categorías que empujan, sin dinero).
     let empujar: [String]
 
     enum CodingKeys: String, CodingKey {
@@ -62,7 +60,7 @@ struct Vista: Decodable {
         case hayProductos, pendientes, decisiones, vendibles, puedeMinimo, efectoSaltar, puedeNuevo
         case bajon, textoBajon, porqueGuardado, fraseSaltar, productos, medallas
         case reto, tecnicas, tecnicasNuevas, secretas, ganchos, avisos, primerVideo, consejo, ultimoTotal
-        case favoritas, frasesConfig, misTecnicas, fraseIds, enviadasHoy, empujar
+        case favoritas, frasesConfig, misTecnicas, enviadasHoy, empujar
     }
 
     init(from decoder: Decoder) throws {
@@ -103,7 +101,6 @@ struct Vista: Decodable {
         favoritas = try c.decodeIfPresent([String].self, forKey: .favoritas) ?? []
         frasesConfig = try c.decodeIfPresent(FrasesConfig.self, forKey: .frasesConfig) ?? .porDefecto
         misTecnicas = try c.decodeIfPresent([MiTecnica].self, forKey: .misTecnicas) ?? []
-        fraseIds = try c.decodeIfPresent([String].self, forKey: .fraseIds) ?? []
         enviadasHoy = try c.decodeIfPresent([FraseEnviada].self, forKey: .enviadasHoy) ?? []
         empujar = try c.decodeIfPresent([String].self, forKey: .empujar) ?? []
     }

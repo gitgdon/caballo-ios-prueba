@@ -41,7 +41,8 @@ function vista(json) {
     frase: q ? { texto: q.texto, autor: q.autor, detalle: q.detalle || q.texto, video: q.video.titulo } : null,
     porque: whyToShow(s, now),
     producto: p ? {
-      n: enteroPuente(Number(p.id.slice(1))), nombre: p.name,
+      // Posición entre los productos que quedan (los borrados no cuentan para el Producto N/30).
+      n: enteroPuente(s.products.indexOf(p) + 1), nombre: p.name,
       dia: p.status === 'test' ? enteroPuente(testDay(p, hoy)) : 0,
       ganadores: enteroPuente(p.winners), videos: enteroPuente(p.videos), bajon: inBajon(p, hoy),
     } : null,
@@ -101,9 +102,9 @@ function vista(json) {
         producto: m.producto == null ? null : String(m.producto), dia: m.dia == null ? '' : String(m.dia),
       };
     }),
-    fraseIds: FRASES.map(function (f) { return f.id; }),
     enviadasHoy: frasesDeHoyEnviadas(s, now, FRASES, EXTRA_PUENTE),
-    empujar: frasesParaEmpujar(FRASES, s).map(function (f) { return f.id; }),
+    // "Dame una frase": siempre las 4 categorías sin dinero; soloFavoritas solo cambia los avisos.
+    empujar: frasesDeCategorias(FRASES).map(function (f) { return f.id; }),
   });
 }
 

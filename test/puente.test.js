@@ -275,18 +275,17 @@ test('deshacer (rebase): las acciones que no se deshacen conmutan con hecho y ga
   }
 });
 
-test('vista: favoritas, frasesConfig, misTecnicas, fraseIds, enviadasHoy y empujar por defecto', () => {
+test('vista: favoritas, frasesConfig, misTecnicas, enviadasHoy y empujar por defecto', () => {
   const v = vista(null);
   assert.deepStrictEqual(v.favoritas, []);
   assert.deepStrictEqual(v.frasesConfig, { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false });
   assert.deepStrictEqual(v.misTecnicas, []);
+  assert.strictEqual(v.fraseIds, undefined);
   const ids = JSON.parse(ctx.frasesTodas()).map((f) => f.id);
-  assert.strictEqual(v.fraseIds.length, 477);
-  assert.deepStrictEqual(v.fraseIds, ids);
   // A las 10:00 del test el aviso de las 10:00 aún no ha salido.
   assert.deepStrictEqual(v.enviadasHoy, []);
   assert.ok(v.empujar.length > 100 && v.empujar.length < 477);
-  for (const id of v.empujar) assert.ok(v.fraseIds.includes(id));
+  for (const id of v.empujar) assert.ok(ids.includes(id));
 });
 
 test('vista.enviadasHoy: las frases de hoy anteriores a ahora, la más reciente primero', () => {
@@ -336,11 +335,17 @@ test('vista.frasesConfig y favoritas: un estado guardado roto sale con tipos vá
   assert.deepStrictEqual(v.favoritas, ['f001']);
 });
 
-test('empujar: con soloFavoritas y 3 favoritas son esas', () => {
+test('empujar: soloFavoritas no cambia "Dame una frase" (4 categorías, sin dinero)', () => {
   let json = null;
   for (const id of ['f003', 'f001', 'f002']) json = accion(json, 'favorita', [id]).estado;
   json = accion(json, 'frasesConfig', [JSON.stringify({ soloFavoritas: true })]).estado;
-  assert.deepStrictEqual(vista(json).empujar, ['f001', 'f002', 'f003']);
+  const empujar = vista(json).empujar;
+  assert.deepStrictEqual(empujar, vista(null).empujar);
+  const porId = new Map(JSON.parse(ctx.frasesTodas()).map((f) => [f.id, f]));
+  for (const id of empujar) {
+    assert.ok(['accion', 'disciplina', 'imperfecto', 'verguenza'].includes(porId.get(id).categoria), id);
+    assert.doesNotMatch(porId.get(id).texto.toLowerCase(), /dinero|€|\$/, id);
+  }
 });
 
 test('avisosFrases(json): array de avisos de frase con fraseId', () => {
@@ -366,6 +371,15 @@ test('borrarProducto y renombrarProducto', () => {
   assert.strictEqual(r.ganador, null);
   assert.deepStrictEqual(vista(r.estado).productos.map((p) => p.id), ['p2']);
   assert.strictEqual(accion(r.estado, 'borrarProducto', ['p9']).estado, r.estado);
+});
+
+test('vista.producto.n: los productos borrados no cuentan para el Producto N/30', () => {
+  let json = accion(null, 'nuevo', ['Lámpara', 'casa']).estado;
+  json = accion(json, 'nuevo', ['Taza', 'casa']).estado;
+  json = accion(json, 'borrarProducto', ['p1']).estado;
+  const v = vista(json);
+  assert.strictEqual(v.producto.nombre, 'Taza');
+  assert.strictEqual(v.producto.n, 1);
 });
 
 test('decidir descartar de un producto borrado: checkpoint null', () => {

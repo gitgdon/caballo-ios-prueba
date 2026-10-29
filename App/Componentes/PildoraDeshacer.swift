@@ -52,7 +52,6 @@ private struct ModificadorPildora: ViewModifier {
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                         .accessibilityAction(.escape) { modelo.pildora = nil }
                         .task(id: aviso.id) {
-                            AccessibilityNotification.Announcement("\(aviso.texto). Deshacer disponible").post()
                             // Con VoiceOver no caduca sola: se cierra con el gesto de escape o deshaciendo.
                             if UIAccessibility.isVoiceOverRunning { return }
                             try? await Task.sleep(nanoseconds: 6_000_000_000)
