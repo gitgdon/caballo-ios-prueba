@@ -47,6 +47,7 @@ struct CatalogoFrases {
 struct Frases: View {
     @ObservedObject var modelo: Modelo
     @State private var busqueda = ""
+    @State private var buscando = false
     @State private var mostrada: FraseCompleta?
     @State private var detalle: FraseCompleta?
 
@@ -59,7 +60,7 @@ struct Frases: View {
                 .scrollContentBackground(.hidden)
                 .background(Tema.fondo)
                 .navigationTitle("Frases")
-                .searchable(text: $busqueda, prompt: "Buscar por texto o autor")
+                .searchable(text: $busqueda, isPresented: $buscando, prompt: "Buscar por texto o autor")
                 .navigationDestination(item: $detalle) { f in DetalleFrase(modelo: modelo, frase: f) }
                 .onAppear { abrirPedida(proxy) }
                 .onChange(of: modelo.fraseAbierta) { _, _ in abrirPedida(proxy) }
@@ -83,7 +84,6 @@ struct Frases: View {
         Section {
             Button("Dame una frase", action: darFrase)
                 .buttonStyle(.principal)
-                .accessibilityLabel(mostrada == nil ? "Dame una frase" : "Dame otra frase")
                 .listRowInsets(EdgeInsets())
                 .listRowBackground(Color.clear)
                 .id("arriba")
@@ -132,12 +132,14 @@ struct Frases: View {
         guard let pedida = modelo.fraseAbierta else { return }
         modelo.fraseAbierta = nil
         busqueda = ""
+        buscando = false
+        // Un runloop después: la lista sin búsqueda ya existe y Frases ha terminado de entrar (arranque en frío).
         if pedida == "azar" {
             detalle = nil
             darFrase()
-            proxy.scrollTo("arriba", anchor: .top)
+            DispatchQueue.main.async { proxy.scrollTo("arriba", anchor: .top) }
         } else if let f = catalogo.porId[pedida] {
-            detalle = f
+            DispatchQueue.main.async { detalle = f }
         }
     }
 }

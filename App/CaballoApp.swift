@@ -100,7 +100,14 @@ final class Modelo: ObservableObject {
     /// Frase pedida desde un aviso (su id) o desde el icono ("azar"); la pantalla de Frases la abre y la vacía.
     @Published var fraseAbierta: String?
     /// Las 477 frases agrupadas para la pantalla de Frases; se leen una sola vez.
-    private(set) lazy var catalogo = CatalogoFrases(juego.frases())
+    var catalogo: CatalogoFrases {
+        if let c = catalogoLeido { return c }
+        let c = CatalogoFrases(juego.frases())
+        // Si la lectura falla, se reintenta la próxima vez.
+        if !c.todas.isEmpty { catalogoLeido = c }
+        return c
+    }
+    private var catalogoLeido: CatalogoFrases?
     /// Ids que "Dame una frase" ha mostrado en esta sesión (los 5 últimos).
     var frasesMostradas: [String] = []
 
