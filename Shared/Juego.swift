@@ -284,16 +284,32 @@ final class Juego {
     @discardableResult
     func accion(_ nombre: String, _ args: [String] = [], origen: String = "app") -> Resultado? {
         let antes = estado
+        let esDeshacible = Self.deshacibles.contains(nombre)
+        // Se lee antes de escribir; solo hace falta para las acciones que no se deshacen.
+        let previa = esDeshacible ? nil : copia()
         let argsJson = (try? JSONSerialization.data(withJSONObject: args)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
         guard let json = llamar("accion", [antes ?? NSNull(), nombre, argsJson]),
               let r = try? JSONDecoder().decode(Resultado.self, from: Data(json.utf8)) else { return nil }
         estado = r.estado
-        if Self.deshacibles.contains(nombre), r.estado != antes {
-            guardarCopia(CopiaDeshacer(antes: antes, despues: r.estado, nombre: nombre, origen: origen,
-                                       hora: ISO8601DateFormatter().string(from: Date())))
+        if esDeshacible {
+            if r.estado != antes {
+                guardarCopia(CopiaDeshacer(antes: antes, despues: r.estado, nombre: nombre, origen: origen,
+                                           hora: Self.iso.string(from: Date())))
+            }
+        } else if let c = previa, c.despues == antes, r.estado != antes {
+            // La acción que no se deshace se aplica también a `antes`, para que deshacer no la pierda ni se pierda.
+            // llamar() no toca `estado`.
+            if let j = llamar("accion", [c.antes ?? NSNull(), nombre, argsJson]),
+               let r2 = try? JSONDecoder().decode(Resultado.self, from: Data(j.utf8)) {
+                guardarCopia(CopiaDeshacer(antes: r2.estado, despues: r.estado, nombre: c.nombre, origen: c.origen, hora: c.hora))
+            } else {
+                guardarCopia(nil)
+            }
         }
         return r
     }
+
+    private static let iso = ISO8601DateFormatter()
 
     /// Acciones que ofrecen deshacer.
     static let deshacibles: Set<String> = [
@@ -305,7 +321,7 @@ final class Juego {
     /// La última acción, solo si el estado guardado sigue siendo el de justo después; si no, se olvida.
     func deshacible() -> Deshacer? {
         guard let c = copia() else { return nil }
-        guard estado == c.despues, let hora = ISO8601DateFormatter().date(from: c.hora) else {
+        guard estado == c.despues, let hora = Self.iso.date(from: c.hora) else {
             guardarCopia(nil)
             return nil
         }
@@ -313,9 +329,14 @@ final class Juego {
     }
 
     /// Vuelve al estado de antes de la última acción (si `deshacible()` la ofrece).
+    /// Después: recargar widgets y tarjeta, reprogramar los dos planes de avisos y, si no había partida antes, `preparar()`.
     @discardableResult
     func deshacer() -> Bool {
-        guard deshacible() != nil, let c = copia() else { return false }
+        guard let c = copia() else { return false }
+        guard estado == c.despues, Self.iso.date(from: c.hora) != nil else {
+            guardarCopia(nil)
+            return false
+        }
         estado = c.antes
         guardarCopia(nil)
         return true

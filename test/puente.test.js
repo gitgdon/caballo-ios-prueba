@@ -257,6 +257,24 @@ test('vista: un estado guardado roto sigue dando enteros y nombres', () => {
 
 // ── Ronda 4 ──
 
+test('deshacer (rebase): las acciones que no se deshacen conmutan con hecho y ganador', () => {
+  const s0 = enTest('2026-10-20', 2);
+  const mision = vista(s0).pendientes[0].id;
+  const xs = [['hecho', [mision]], ['ganador', ['p1']]];
+  const ys = [
+    ['porque', ['Por mi familia']], ['bajonVisto', ['p1']], ['tecnicaVista', []],
+    ['avisosConfig', ['0', '20:00']], ['favorita', ['f001']], ['frasesConfig', [JSON.stringify({ cadaHoras: 2, sonido: true })]],
+  ];
+  for (const [x, ax] of xs) {
+    for (const [y, ay] of ys) {
+      const xy = accion(accion(s0, x, ax).estado, y, ay).estado;
+      const yx = accion(accion(s0, y, ay).estado, x, ax).estado;
+      assert.deepStrictEqual(JSON.parse(xy), JSON.parse(yx), x + ' / ' + y);
+      assert.notStrictEqual(accion(s0, y, ay).estado, accion(s0, '', []).estado, y + ' cambia algo');
+    }
+  }
+});
+
 test('vista: favoritas, frasesConfig, misTecnicas, fraseIds, enviadasHoy y empujar por defecto', () => {
   const v = vista(null);
   assert.deepStrictEqual(v.favoritas, []);
