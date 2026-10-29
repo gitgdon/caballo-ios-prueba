@@ -254,3 +254,161 @@ test('vista: un estado guardado roto sigue dando enteros y nombres', () => {
     { id: 'de-una-version-futura', nombre: 'de-una-version-futura' },
   ]);
 });
+
+// ── Ronda 4 ──
+
+test('vista: favoritas, frasesConfig, misTecnicas, fraseIds, enviadasHoy y empujar por defecto', () => {
+  const v = vista(null);
+  assert.deepStrictEqual(v.favoritas, []);
+  assert.deepStrictEqual(v.frasesConfig, { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false });
+  assert.deepStrictEqual(v.misTecnicas, []);
+  const ids = JSON.parse(ctx.frasesTodas()).map((f) => f.id);
+  assert.strictEqual(v.fraseIds.length, 477);
+  assert.deepStrictEqual(v.fraseIds, ids);
+  // A las 10:00 del test el aviso de las 10:00 aún no ha salido.
+  assert.deepStrictEqual(v.enviadasHoy, []);
+  assert.ok(v.empujar.length > 100 && v.empujar.length < 477);
+  for (const id of v.empujar) assert.ok(v.fraseIds.includes(id));
+});
+
+test('vista.enviadasHoy: las frases de hoy anteriores a ahora, la más reciente primero', () => {
+  const c = contexto(at(HOY, 17));
+  const v = JSON.parse(c.vista(null));
+  assert.deepStrictEqual(v.enviadasHoy.map((f) => f.fecha), ['2026-10-27T16:00', '2026-10-27T13:00', '2026-10-27T10:00']);
+  for (const f of v.enviadasHoy) assert.deepStrictEqual(Object.keys(f).sort(), ['fecha', 'fraseId']);
+});
+
+test('frasesTodas: id, texto, autor, categoria, detalle y título del vídeo', () => {
+  const todas = JSON.parse(ctx.frasesTodas());
+  assert.strictEqual(todas.length, 477);
+  for (const f of todas) {
+    assert.deepStrictEqual(Object.keys(f).sort(), ['autor', 'categoria', 'detalle', 'id', 'texto', 'video']);
+    for (const k of Object.keys(f)) assert.strictEqual(typeof f[k], 'string', f.id + '.' + k);
+  }
+  assert.strictEqual(todas[0].id, 'f001');
+  assert.strictEqual(todas[0].video, 'John Ruiz, abogado billonario (Gables Estates)');
+});
+
+test('favorita: añade y quita; vista.favoritas lo refleja', () => {
+  let json = accion(null, 'favorita', ['f001']).estado;
+  json = accion(json, 'favorita', ['f002']).estado;
+  assert.deepStrictEqual(vista(json).favoritas, ['f001', 'f002']);
+  json = accion(json, 'favorita', ['f001']).estado;
+  assert.deepStrictEqual(vista(json).favoritas, ['f002']);
+});
+
+test('frasesConfig: JSON válido cambia; JSON roto o valores malos no cambian nada', () => {
+  let json = accion(null, 'frasesConfig', [JSON.stringify({ cadaHoras: 2, desde: '09:00', soloFavoritas: true, sonido: true })]).estado;
+  assert.deepStrictEqual(vista(json).frasesConfig, { activos: true, cadaHoras: 2, desde: '09:00', hasta: '22:00', soloFavoritas: true, sonido: true });
+  const antes = vista(json).frasesConfig;
+  for (const malo of ['{', '', 'null', '"x"', JSON.stringify({ cadaHoras: 9, desde: '25:00', activos: 'no' })]) {
+    json = accion(json, 'frasesConfig', [malo]).estado;
+    assert.deepStrictEqual(vista(json).frasesConfig, antes, malo);
+  }
+  json = accion(json, 'frasesConfig', []).estado;
+  assert.deepStrictEqual(vista(json).frasesConfig, antes);
+});
+
+test('vista.frasesConfig y favoritas: un estado guardado roto sale con tipos válidos', () => {
+  const s = JSON.parse(accion(null, 'favorita', ['f001']).estado);
+  s.frasesConfig = { activos: 'x', cadaHoras: 2.5, desde: 'a', hasta: 'b', soloFavoritas: 1, sonido: null };
+  s.favoritas = ['f001', 3, null];
+  const v = vista(JSON.stringify(s));
+  assert.deepStrictEqual(v.frasesConfig, { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false });
+  assert.deepStrictEqual(v.favoritas, ['f001']);
+});
+
+test('empujar: con soloFavoritas y 3 favoritas son esas', () => {
+  let json = null;
+  for (const id of ['f003', 'f001', 'f002']) json = accion(json, 'favorita', [id]).estado;
+  json = accion(json, 'frasesConfig', [JSON.stringify({ soloFavoritas: true })]).estado;
+  assert.deepStrictEqual(vista(json).empujar, ['f001', 'f002', 'f003']);
+});
+
+test('avisosFrases(json): array de avisos de frase con fraseId', () => {
+  const plan = JSON.parse(ctx.avisosFrases(null));
+  assert.ok(Array.isArray(plan) && plan.length > 0);
+  for (const a of plan) {
+    assert.strictEqual(a.tipo, 'frase');
+    assert.match(a.fraseId, /^f\d{3}$/);
+    assert.match(a.fecha, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+  }
+  const off = accion(null, 'frasesConfig', [JSON.stringify({ activos: false })]).estado;
+  assert.deepStrictEqual(JSON.parse(ctx.avisosFrases(off)), []);
+});
+
+test('borrarProducto y renombrarProducto', () => {
+  let json = accion(null, 'nuevo', ['Lámpara', 'casa']).estado;
+  json = accion(json, 'nuevo', ['Taza', 'casa']).estado;
+  json = accion(json, 'renombrarProducto', ['p1', '  Lámpara azul ']).estado;
+  assert.strictEqual(vista(json).productos[0].nombre, 'Lámpara azul');
+  assert.strictEqual(accion(json, 'renombrarProducto', ['p1', '   ']).estado, json);
+  const r = accion(json, 'borrarProducto', ['p1']);
+  assert.strictEqual(r.checkpoint, null);
+  assert.strictEqual(r.ganador, null);
+  assert.deepStrictEqual(vista(r.estado).productos.map((p) => p.id), ['p2']);
+  assert.strictEqual(accion(r.estado, 'borrarProducto', ['p9']).estado, r.estado);
+});
+
+test('decidir descartar de un producto borrado: checkpoint null', () => {
+  const s = JSON.parse(enTest('2026-10-01', 4));
+  s.products[0].status = 'decision';
+  const json = accion(JSON.stringify(s), 'borrarProducto', ['p1']).estado;
+  const r = accion(json, 'decidir', ['p1', 'descartar']);
+  assert.strictEqual(r.checkpoint, null);
+  assert.strictEqual(r.estado, json);
+  for (const [nombre, args] of [['ganador', ['p1']], ['viral', ['p1', 'tiktok']], ['vendido', ['p1']], ['decidir', ['p1', 'poco']]]) {
+    const x = accion(json, nombre, args);
+    assert.strictEqual(x.estado, json, nombre);
+    assert.strictEqual(x.ganador, null, nombre);
+  }
+});
+
+test('editarGasto: índice, importe y concepto como texto', () => {
+  let json = accion(null, 'gasto', ['12.5', 'Envío']).estado;
+  json = accion(json, 'editarGasto', ['0', '20.25', 'Muestras']).estado;
+  const m = JSON.parse(json).movimientos[0];
+  assert.strictEqual(m.concepto, 'Muestras');
+  assert.strictEqual(m.importe, 20.25);
+  for (const args of [['0', 'abc', 'X'], ['0', '', 'X'], ['', '5', 'X'], ['7', '5', 'X'], ['0', '-3', 'X']]) {
+    assert.strictEqual(accion(json, 'editarGasto', args).estado, json, args.join('|'));
+  }
+});
+
+test('editarGancho y borrarGancho por índice', () => {
+  let json = accion(null, 'nuevo', ['Lámpara', 'casa']).estado;
+  json = accion(json, 'gancho', ['p1', 'Primero', '5000']).estado;
+  json = accion(json, 'gancho', ['p1', 'Segundo', '6000']).estado;
+  json = accion(json, 'editarGancho', ['1', 'Segundo bueno']).estado;
+  assert.deepStrictEqual(vista(json).ganchos.map((g) => g.texto), ['Primero', 'Segundo bueno']);
+  assert.strictEqual(accion(json, 'editarGancho', ['x', 'Nada']).estado, json);
+  json = accion(json, 'borrarGancho', ['0']).estado;
+  assert.deepStrictEqual(vista(json).ganchos.map((g) => g.texto), ['Segundo bueno']);
+  assert.strictEqual(accion(json, 'borrarGancho', ['']).estado, json);
+});
+
+test('miTecnica, editarMiTecnica y borrarMiTecnica; vista.misTecnicas', () => {
+  let json = accion(null, 'nuevo', ['Lámpara', 'casa']).estado;
+  json = accion(json, 'miTecnica', ['Gancho con pregunta', 'p1']).estado;
+  json = accion(json, 'miTecnica', ['Luz natural', '']).estado;
+  assert.strictEqual(accion(json, 'miTecnica', ['Nada', 'p9']).estado, json);
+  assert.strictEqual(accion(json, 'miTecnica', ['   ', '']).estado, json);
+  assert.deepStrictEqual(vista(json).misTecnicas, [
+    { id: 'mt1', texto: 'Gancho con pregunta', producto: 'p1', dia: HOY },
+    { id: 'mt2', texto: 'Luz natural', producto: null, dia: HOY },
+  ]);
+  json = accion(json, 'editarMiTecnica', ['mt2', 'Luz de ventana']).estado;
+  assert.strictEqual(vista(json).misTecnicas[1].texto, 'Luz de ventana');
+  json = accion(json, 'borrarMiTecnica', ['mt1']).estado;
+  assert.deepStrictEqual(vista(json).misTecnicas.map((m) => m.id), ['mt2']);
+});
+
+test('vista.misTecnicas: producto borrado se mantiene como id; campos rotos salen como texto', () => {
+  let json = accion(null, 'nuevo', ['Lámpara', 'casa']).estado;
+  json = accion(json, 'miTecnica', ['Gancho', 'p1']).estado;
+  json = accion(json, 'borrarProducto', ['p1']).estado;
+  assert.strictEqual(vista(json).misTecnicas[0].producto, 'p1');
+  const s = JSON.parse(json);
+  s.misTecnicas.push({ id: 5, texto: null, producto: 3 });
+  assert.deepStrictEqual(vista(JSON.stringify(s)).misTecnicas[1], { id: '5', texto: '', producto: '3', dia: '' });
+});

@@ -87,11 +87,52 @@ function vista(json) {
     avisos: { activos: s.avisos.activos, hora: s.avisos.hora },
     primerVideo: primerVideoActivo(s, now),
     consejo: { texto: consejo.texto, autor: consejo.autor },
+    favoritas: s.favoritas.filter(function (id) { return typeof id === 'string'; }),
+    frasesConfig: (function (c) {
+      return {
+        activos: typeof c.activos === 'boolean' ? c.activos : true, cadaHoras: enteroPuente(c.cadaHoras),
+        desde: String(c.desde), hasta: String(c.hasta), soloFavoritas: c.soloFavoritas === true, sonido: c.sonido === true,
+      };
+    })(frasesConfigValida(s)),
+    misTecnicas: s.misTecnicas.filter(function (m) { return m && typeof m === 'object'; }).map(function (m) {
+      return {
+        id: String(m.id), texto: m.texto == null ? '' : String(m.texto),
+        producto: m.producto == null ? null : String(m.producto), dia: m.dia == null ? '' : String(m.dia),
+      };
+    }),
+    fraseIds: FRASES.map(function (f) { return f.id; }),
+    enviadasHoy: frasesDeHoyEnviadas(s, now, FRASES, EXTRA_PUENTE),
+    empujar: frasesParaEmpujar(FRASES, s).map(function (f) { return f.id; }),
   });
 }
 
 function avisos(json) {
   return JSON.stringify(planAvisos(parseState(json), new Date(), FRASES, EXTRA_PUENTE));
+}
+
+// Avisos de frases de hoy y mañana (planFrases de core.js).
+function avisosFrases(json) {
+  return JSON.stringify(planFrases(parseState(json), new Date(), FRASES, EXTRA_PUENTE));
+}
+
+// Todas las frases para el apartado Frases (Swift la lee una vez). `video` es el título del vídeo.
+function frasesTodas() {
+  return JSON.stringify(FRASES.map(function (f) {
+    return {
+      id: f.id, texto: f.texto, autor: f.autor, categoria: f.categoria,
+      detalle: f.detalle || f.texto, video: f.video && f.video.titulo ? f.video.titulo : '',
+    };
+  }));
+}
+
+// Cambios de frasesConfig mandados como texto JSON; si no es un objeto, no cambia nada.
+function cambiosFrases(texto) {
+  try {
+    var c = JSON.parse(texto);
+    return c && typeof c === 'object' && !Array.isArray(c) ? c : null;
+  } catch (e) {
+    return null;
+  }
 }
 
 // Calendario de dinero del mes 'YYYY-MM' (calendarioMes de core.js); 'null' si el mes no es válido.
@@ -119,15 +160,17 @@ function accion(json, nombre, argsJson) {
   var a = JSON.parse(argsJson || '[]');
   var fase = null;
   var gancho = false;
+  // Un producto borrado puede seguir en una hoja abierta: sobre él, ganador/viral/vendido/decidir no hacen nada.
+  var existe = s.products.some(function (x) { return x.id === a[0]; });
   switch (nombre) {
     case 'hecho': s = completeMission(s, a[0], now, EXTRA_PUENTE); break;
     case 'minimo': s = startMinimo(s, now, EXTRA_PUENTE); break;
     case 'saltar': s = skipToday(s, now); break;
-    case 'ganador': s = markWinner(s, a[0], now); break;
-    case 'viral': s = markViral(s, a[0], a[1], now); break;
-    case 'vendido': s = markSold(s, a[0], now); break;
+    case 'ganador': if (existe) s = markWinner(s, a[0], now); break;
+    case 'viral': if (existe) s = markViral(s, a[0], a[1], now); break;
+    case 'vendido': if (existe) s = markSold(s, a[0], now); break;
     case 'nuevo': s = createProduct(s, { name: a[0], place: a[1], copia: a[2] === 'si' ? true : a[2] === 'no' ? false : null }); break;
-    case 'decidir': s = decide(s, a[0], a[1], now); break;
+    case 'decidir': if (existe) s = decide(s, a[0], a[1], now); break;
     case 'porque': s = setWhy(s, a[0]); break;
     case 'bajonVisto': s = markBajonAvisado(s, a); break;
     case 'facturacion': s = apuntarFacturacion(s, numeroPuente(a[0]), now); break;
@@ -153,9 +196,24 @@ function accion(json, nombre, argsJson) {
       if (id) s = completeMission(s, id, now, EXTRA_PUENTE);
       break;
     }
+    case 'favorita': if (typeof a[0] === 'string' && a[0]) s = alternarFavorita(s, a[0]); break;
+    case 'frasesConfig': {
+      var cambios = cambiosFrases(a[0]);
+      if (cambios) s = configurarFrases(s, cambios);
+      break;
+    }
+    case 'borrarProducto': s = borrarProducto(s, a[0], now); break;
+    case 'renombrarProducto': s = renombrarProducto(s, a[0], a[1]); break;
+    case 'editarGasto': s = editarGasto(s, numeroPuente(a[0]), numeroPuente(a[1]), a[2]); break;
+    case 'editarGancho': s = editarGancho(s, numeroPuente(a[0]), a[1]); break;
+    case 'borrarGancho': s = borrarGancho(s, numeroPuente(a[0])); break;
+    case 'miTecnica': s = anadirMiTecnica(s, a[0], a[1] ? a[1] : null, now); break;
+    case 'editarMiTecnica': s = editarMiTecnica(s, a[0], a[1]); break;
+    case 'borrarMiTecnica': s = borrarMiTecnica(s, a[0]); break;
   }
   var producto = s.products.find(function (x) { return x.id === a[0]; });
-  var descarte = nombre === 'decidir' && a[1] === 'descartar';
+  // Sin checkpoint si el producto ya no existía (borrado): no se descartó nada.
+  var descarte = nombre === 'decidir' && a[1] === 'descartar' && existe;
   var resumen = descarte ? resumenDescarte(s, a[0]) : null;
   return JSON.stringify({
     estado: JSON.stringify(s),

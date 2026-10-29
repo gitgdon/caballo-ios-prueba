@@ -46,12 +46,23 @@ struct Vista: Decodable {
     let primerVideo: Bool, consejo: Consejo?
     /// Último total de la tienda apuntado (no se reinicia con un reto nuevo).
     let ultimoTotal: Int
+    /// Ids de las frases favoritas.
+    let favoritas: [String]
+    let frasesConfig: FrasesConfig
+    let misTecnicas: [MiTecnica]
+    /// Todos los ids de frase, en el orden de FRASES.
+    let fraseIds: [String]
+    /// Avisos de frase que ya salieron hoy, el más reciente primero.
+    let enviadasHoy: [FraseEnviada]
+    /// Ids para "Dame una frase" (categorías que empujan, sin dinero; o las favoritas).
+    let empujar: [String]
 
     enum CodingKeys: String, CodingKey {
         case nivel, rango, xp, xpSig, racha, escudos, humor, mision, frase, porque, producto
         case hayProductos, pendientes, decisiones, vendibles, puedeMinimo, efectoSaltar, puedeNuevo
         case bajon, textoBajon, porqueGuardado, fraseSaltar, productos, medallas
         case reto, tecnicas, tecnicasNuevas, secretas, ganchos, avisos, primerVideo, consejo, ultimoTotal
+        case favoritas, frasesConfig, misTecnicas, fraseIds, enviadasHoy, empujar
     }
 
     init(from decoder: Decoder) throws {
@@ -89,6 +100,12 @@ struct Vista: Decodable {
         primerVideo = try c.decodeIfPresent(Bool.self, forKey: .primerVideo) ?? false
         consejo = try c.decodeIfPresent(Consejo.self, forKey: .consejo)
         ultimoTotal = try c.decodeIfPresent(Int.self, forKey: .ultimoTotal) ?? 0
+        favoritas = try c.decodeIfPresent([String].self, forKey: .favoritas) ?? []
+        frasesConfig = try c.decodeIfPresent(FrasesConfig.self, forKey: .frasesConfig) ?? .porDefecto
+        misTecnicas = try c.decodeIfPresent([MiTecnica].self, forKey: .misTecnicas) ?? []
+        fraseIds = try c.decodeIfPresent([String].self, forKey: .fraseIds) ?? []
+        enviadasHoy = try c.decodeIfPresent([FraseEnviada].self, forKey: .enviadasHoy) ?? []
+        empujar = try c.decodeIfPresent([String].self, forKey: .empujar) ?? []
     }
 
     var lineaNivel: String {
@@ -152,11 +169,41 @@ struct Fase: Decodable {
     let fase: String, donde: String, cambio: String
 }
 
-/// Un aviso planificado. `fecha` es hora local "YYYY-MM-DDTHH:MM"; `tipo` es grabar, repetir o racha.
+/// Un aviso planificado. `fecha` es hora local "YYYY-MM-DDTHH:MM"; `tipo` es grabar, repetir, racha o frase.
+/// `misionId` solo en los de misión; `fraseId` solo en los de frase.
 struct AvisoPlan: Decodable, Identifiable {
     let id: String, fecha: String, titulo: String, cuerpo: String
     let misionId: String?
     let tipo: String
+    let fraseId: String?
+}
+
+/// Ajustes de los avisos de frases. `desde`/`hasta` "HH:MM" (hasta inclusiva); `cadaHoras` de 1 a 6.
+struct FrasesConfig: Decodable, Equatable {
+    let activos: Bool, cadaHoras: Int, desde: String, hasta: String, soloFavoritas: Bool, sonido: Bool
+
+    static let porDefecto = FrasesConfig(activos: true, cadaHoras: 3, desde: "10:00", hasta: "22:00", soloFavoritas: false, sonido: false)
+}
+
+/// Técnica propia (nota). `producto` es el id ("p1") o nil; puede ser de un producto ya borrado.
+struct MiTecnica: Decodable, Identifiable, Hashable {
+    let id: String, texto: String, producto: String?, dia: String
+}
+
+/// Aviso de frase que ya salió hoy; `fecha` es hora local "YYYY-MM-DDTHH:MM".
+struct FraseEnviada: Decodable, Identifiable, Hashable {
+    let fraseId: String, fecha: String
+    var id: String { fecha }
+}
+
+/// Una frase de FRASES completa; `video` es el título del vídeo.
+struct FraseCompleta: Decodable, Identifiable, Hashable {
+    let id: String, texto: String, autor: String, categoria: String, detalle: String, video: String
+}
+
+/// Última acción que se puede deshacer. `origen` es "app", "widget" o "aviso".
+struct Deshacer: Equatable {
+    let nombre: String, origen: String, hora: Date
 }
 
 /// Calendario de dinero de un mes (calendarioMes de core.js): un día por cada día del mes.
@@ -233,13 +280,80 @@ final class Juego {
         return try? JSONDecoder().decode(Vista.self, from: Data(json.utf8))
     }
 
+    /// `origen`: "app", "widget" o "aviso". Las acciones de `deshacibles` que cambian el estado se pueden deshacer.
     @discardableResult
-    func accion(_ nombre: String, _ args: [String] = []) -> Resultado? {
+    func accion(_ nombre: String, _ args: [String] = [], origen: String = "app") -> Resultado? {
+        let antes = estado
         let argsJson = (try? JSONSerialization.data(withJSONObject: args)).flatMap { String(data: $0, encoding: .utf8) } ?? "[]"
-        guard let json = llamar("accion", [estado ?? NSNull(), nombre, argsJson]),
+        guard let json = llamar("accion", [antes ?? NSNull(), nombre, argsJson]),
               let r = try? JSONDecoder().decode(Resultado.self, from: Data(json.utf8)) else { return nil }
         estado = r.estado
+        if Self.deshacibles.contains(nombre), r.estado != antes {
+            guardarCopia(CopiaDeshacer(antes: antes, despues: r.estado, nombre: nombre, origen: origen,
+                                       hora: ISO8601DateFormatter().string(from: Date())))
+        }
         return r
+    }
+
+    /// Acciones que ofrecen deshacer.
+    static let deshacibles: Set<String> = [
+        "hecho", "hechoAviso", "minimo", "saltar", "ganador", "viral", "vendido", "nuevo", "decidir",
+        "facturacion", "gasto", "borrarMovimiento", "editarGasto", "visitas", "gancho", "editarGancho", "borrarGancho",
+        "miTecnica", "editarMiTecnica", "borrarMiTecnica", "renombrarProducto", "borrarProducto", "reto", "retoNuevo",
+    ]
+
+    /// La última acción, solo si el estado guardado sigue siendo el de justo después; si no, se olvida.
+    func deshacible() -> Deshacer? {
+        guard let c = copia() else { return nil }
+        guard estado == c.despues, let hora = ISO8601DateFormatter().date(from: c.hora) else {
+            guardarCopia(nil)
+            return nil
+        }
+        return Deshacer(nombre: c.nombre, origen: c.origen, hora: hora)
+    }
+
+    /// Vuelve al estado de antes de la última acción (si `deshacible()` la ofrece).
+    @discardableResult
+    func deshacer() -> Bool {
+        guard deshacible() != nil, let c = copia() else { return false }
+        estado = c.antes
+        guardarCopia(nil)
+        return true
+    }
+
+    /// Texto de la píldora: "Misión hecha", "Producto borrado"… y " desde el widget" / " desde el aviso".
+    static func etiqueta(_ d: Deshacer) -> String {
+        let textos: [String: String] = [
+            "hecho": "Misión hecha", "hechoAviso": "Misión hecha", "minimo": "Mínimo elegido", "saltar": "Día saltado",
+            "ganador": "Ganador apuntado", "viral": "Viral apuntado", "vendido": "Venta apuntada",
+            "nuevo": "Producto creado", "decidir": "Decisión tomada", "facturacion": "Facturación apuntada",
+            "gasto": "Gasto apuntado", "borrarMovimiento": "Gasto borrado", "editarGasto": "Gasto editado",
+            "visitas": "Visitas apuntadas", "gancho": "Gancho guardado", "editarGancho": "Gancho editado",
+            "borrarGancho": "Gancho borrado", "miTecnica": "Técnica guardada", "editarMiTecnica": "Técnica editada",
+            "borrarMiTecnica": "Técnica borrada", "renombrarProducto": "Producto renombrado",
+            "borrarProducto": "Producto borrado", "reto": "Reto cambiado", "retoNuevo": "Reto nuevo",
+        ]
+        let texto = textos[d.nombre] ?? "Hecho"
+        switch d.origen {
+        case "widget": return texto + " desde el widget"
+        case "aviso": return texto + " desde el aviso"
+        default: return texto
+        }
+    }
+
+    /// Lo que se guarda en el App Group, clave "deshacer". `antes` es nil si no había partida.
+    private struct CopiaDeshacer: Codable {
+        let antes: String?, despues: String, nombre: String, origen: String, hora: String
+    }
+
+    private func copia() -> CopiaDeshacer? {
+        guard let texto = UserDefaults(suiteName: Self.grupo)?.string(forKey: "deshacer") else { return nil }
+        return try? JSONDecoder().decode(CopiaDeshacer.self, from: Data(texto.utf8))
+    }
+
+    private func guardarCopia(_ c: CopiaDeshacer?) {
+        let texto = c.flatMap { try? JSONEncoder().encode($0) }.flatMap { String(data: $0, encoding: .utf8) }
+        UserDefaults(suiteName: Self.grupo)?.set(texto, forKey: "deshacer")
     }
 
     /// Plan de avisos de hoy y mañana (planAvisos de core.js).
@@ -248,6 +362,24 @@ final class Juego {
               let plan = try? JSONDecoder().decode([AvisoPlan].self, from: Data(json.utf8)) else { return [] }
         return plan
     }
+
+    /// Plan de avisos de frases de hoy y mañana (planFrases de core.js); `fraseId` en cada uno.
+    func avisosFrases() -> [AvisoPlan] {
+        guard let json = llamar("avisosFrases", [estado ?? NSNull()]),
+              let plan = try? JSONDecoder().decode([AvisoPlan].self, from: Data(json.utf8)) else { return [] }
+        return plan
+    }
+
+    /// Las 477 frases, en el orden de FRASES (se leen una vez por Juego).
+    func frases() -> [FraseCompleta] {
+        if let f = frasesLeidas { return f }
+        guard let json = llamar("frasesTodas", []),
+              let f = try? JSONDecoder().decode([FraseCompleta].self, from: Data(json.utf8)) else { return [] }
+        frasesLeidas = f
+        return f
+    }
+
+    private var frasesLeidas: [FraseCompleta]?
 
     /// Calendario de dinero del mes "YYYY-MM"; nil si el mes no es válido.
     func calendario(mes: String) -> CalendarioMes? {
