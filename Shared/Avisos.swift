@@ -7,14 +7,18 @@ enum Avisos {
     static let accionHecho = "HECHO"
     /// El aviso de racha no lleva "Hecho": marcaría un vídeo que no se ha hecho.
     static let categoriaRacha = "RACHA"
+    /// Aviso de frase: sin botones; al tocarlo se abre la frase.
+    static let categoriaFrase = "FRASE"
     private static let prefijo = "aviso-"
+    private static let prefijoFrase = "frase-"
 
     /// La acción "Hecho" se ejecuta sin abrir la app.
     static func registrarCategoria() {
         let hecho = UNNotificationAction(identifier: accionHecho, title: "Hecho", options: [])
         let cat = UNNotificationCategory(identifier: categoria, actions: [hecho], intentIdentifiers: [], options: [])
         let racha = UNNotificationCategory(identifier: categoriaRacha, actions: [], intentIdentifiers: [], options: [])
-        UNUserNotificationCenter.current().setNotificationCategories([cat, racha])
+        let frase = UNNotificationCategory(identifier: categoriaFrase, actions: [], intentIdentifiers: [], options: [])
+        UNUserNotificationCenter.current().setNotificationCategories([cat, racha, frase])
     }
 
     static func pedirPermisoSiHaceFalta() async {
@@ -26,15 +30,15 @@ enum Avisos {
     /// Se avisa cuando una misión se marca fuera de la app (notificación o widget), para que la app se refresque.
     static let cambioFuera = Notification.Name("CaballoBlanco.cambioFuera")
 
-    /// Programa los avisos del plan actual de este juego.
+    /// Programa los avisos y las frases del plan actual de este juego.
     static func reprogramar(_ juego: Juego) async {
-        await reprogramar(juego.avisos())
+        await reprogramar(juego.avisos() + juego.avisosFrases(), sonidoFrases: juego.vista()?.frasesConfig.sonido ?? false)
     }
 
     /// Primero añade los avisos del plan (el mismo id sustituye al anterior) y después quita los pendientes
     /// que ya no están en él: si iOS cierra el proceso a medias, no se queda sin avisos.
-    /// Sin permiso, el plan no se programa y se quitan todos.
-    static func reprogramar(_ plan: [AvisoPlan]) async {
+    /// Sin permiso, el plan no se programa y se quitan todos. El plan lleva misiones y frases juntas.
+    static func reprogramar(_ plan: [AvisoPlan], sonidoFrases: Bool) async {
         let centro = UNUserNotificationCenter.current()
         var puestos: Set<String> = []
 
@@ -45,11 +49,16 @@ enum Avisos {
                 let contenido = UNMutableNotificationContent()
                 contenido.title = aviso.titulo
                 contenido.body = aviso.cuerpo
-                contenido.sound = .default
-                contenido.categoryIdentifier = aviso.tipo == "racha" ? categoriaRacha : categoria
-                if let m = aviso.misionId { contenido.userInfo = ["misionId": m] }
+                let esFrase = aviso.tipo == "frase"
+                contenido.sound = (!esFrase || sonidoFrases) ? UNNotificationSound.default : nil
+                contenido.categoryIdentifier = esFrase ? categoriaFrase : aviso.tipo == "racha" ? categoriaRacha : categoria
+                var info: [String: String] = [:]
+                if let m = aviso.misionId { info["misionId"] = m }
+                if let f = aviso.fraseId { info["fraseId"] = f }
+                if !info.isEmpty { contenido.userInfo = info }
                 let disparo = UNCalendarNotificationTrigger(dateMatching: cuando, repeats: false)
-                let id = aviso.id.hasPrefix(prefijo) ? aviso.id : prefijo + aviso.id
+                let pre = esFrase ? prefijoFrase : prefijo
+                let id = aviso.id.hasPrefix(pre) ? aviso.id : pre + aviso.id
                 do {
                     try await centro.add(UNNotificationRequest(identifier: id, content: contenido, trigger: disparo))
                     puestos.insert(id)
@@ -59,7 +68,7 @@ enum Avisos {
         }
 
         let sobran = await centro.pendingNotificationRequests().map(\.identifier)
-            .filter { $0.hasPrefix(prefijo) && !puestos.contains($0) }
+            .filter { ($0.hasPrefix(prefijo) || $0.hasPrefix(prefijoFrase)) && !puestos.contains($0) }
         centro.removePendingNotificationRequests(withIdentifiers: sobran)
     }
 

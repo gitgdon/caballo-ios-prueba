@@ -29,6 +29,10 @@ targets:
         CFBundleDisplayName: Caballo Blanco
         UILaunchScreen: {}
         NSSupportsLiveActivities: true
+        UIApplicationShortcutItems:
+          - UIApplicationShortcutItemType: com.caballoblanco.frase
+            UIApplicationShortcutItemTitle: Dame una frase
+            UIApplicationShortcutItemIconSymbolName: quote.bubble
     entitlements:
       path: App/App.entitlements
       properties:

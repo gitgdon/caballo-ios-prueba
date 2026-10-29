@@ -20,17 +20,60 @@ final class DelegadoApp: NSObject, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         Avisos.registrarCategoria()
         UNUserNotificationCenter.current().delegate = avisos
+        if let atajo = launchOptions?[.shortcutItem] as? UIApplicationShortcutItem { _ = abrirFraseDesdeAtajo(atajo) }
         return true
+    }
+
+    /// Con escenas, iOS manda la acción rápida del icono al delegado de la escena.
+    func application(_ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession, options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        let configuracion = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuracion.delegateClass = DelegadoEscena.self
+        return configuracion
+    }
+
+    func application(_ application: UIApplication, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(abrirFraseDesdeAtajo(shortcutItem))
     }
 }
 
-/// El botón "Hecho" de la notificación marca la misión sin abrir la app.
+/// Acción rápida "Dame una frase": con la app cerrada (al conectar la escena) o abierta.
+final class DelegadoEscena: NSObject, UIWindowSceneDelegate {
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        if let atajo = connectionOptions.shortcutItem { _ = abrirFraseDesdeAtajo(atajo) }
+    }
+
+    func windowScene(_ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem, completionHandler: @escaping (Bool) -> Void) {
+        completionHandler(abrirFraseDesdeAtajo(shortcutItem))
+    }
+}
+
+/// Tipo de la acción rápida del icono (UIApplicationShortcutItems en project.yml).
+private let atajoFrase = "com.caballoblanco.frase"
+
+private func abrirFraseDesdeAtajo(_ atajo: UIApplicationShortcutItem) -> Bool {
+    guard atajo.type == atajoFrase else { return false }
+    pedirFrase("azar")
+    return true
+}
+
+/// Deja la frase para que `Modelo.refrescar()` la abra (también si la app arranca en ese momento).
+private func pedirFrase(_ id: String) {
+    UserDefaults(suiteName: Juego.grupo)?.set(id, forKey: "abrirFrase")
+    NotificationCenter.default.post(name: Avisos.cambioFuera, object: nil)
+}
+
+/// El botón "Hecho" de la notificación marca la misión sin abrir la app. Tocar un aviso de frase la abre.
 final class DelegadoAvisos: NSObject, UNUserNotificationCenterDelegate {
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
+        let contenido = response.notification.request.content
+        if response.actionIdentifier == UNNotificationDefaultActionIdentifier, contenido.categoryIdentifier == Avisos.categoriaFrase {
+            if let fraseId = contenido.userInfo["fraseId"] as? String { pedirFrase(fraseId) }
+            return
+        }
         guard response.actionIdentifier == Avisos.accionHecho else { return }
-        let misionId = response.notification.request.content.userInfo["misionId"] as? String
+        let misionId = contenido.userInfo["misionId"] as? String
         let juego = Juego()
-        juego.accion("hechoAviso", [misionId ?? ""])
+        juego.accion("hechoAviso", [misionId ?? ""], origen: "aviso")
         NotificationCenter.default.post(name: Avisos.cambioFuera, object: nil)
         WidgetCenter.shared.reloadAllTimelines()
         await Actividad.actualizar(juego.vista())
@@ -42,14 +85,28 @@ final class DelegadoAvisos: NSObject, UNUserNotificationCenterDelegate {
     }
 }
 
+/// Las pestañas de `Raiz`, en su orden.
+enum Pestana: Hashable {
+    case hoy, productos, mas
+}
+
 @MainActor
 final class Modelo: ObservableObject {
     private let juego = Juego()
     @Published var vista: Vista?
     @Published var aviso: String?
     @Published var ofrecerParalelo = false
+    @Published var pestana: Pestana = .hoy
+    /// Frase pedida desde un aviso (su id) o desde el icono ("azar"); la pantalla de Frases la abre y la vacía.
+    @Published var fraseAbierta: String?
 
     func refrescar() {
+        let grupo = UserDefaults(suiteName: Juego.grupo)
+        if let id = grupo?.string(forKey: "abrirFrase") {
+            grupo?.removeObject(forKey: "abrirFrase")
+            pestana = .mas
+            fraseAbierta = id
+        }
         vista = juego.preparar()
         if let v = vista, !v.bajon.isEmpty, let texto = v.textoBajon {
             juego.accion("bajonVisto", v.bajon)
@@ -64,14 +121,15 @@ final class Modelo: ObservableObject {
         WidgetCenter.shared.reloadAllTimelines()
         let v = vista
         Task { await Actividad.actualizar(v) }
-        // El plan se lee aquí, en el hilo principal: el JSContext de `juego` no se comparte entre tareas.
-        let plan = juego.avisos()
-        Task { await Avisos.reprogramar(plan) }
+        Task { await reprogramarAvisos() }
     }
 
-    /// Plan de avisos de hoy y mañana.
-    func planAvisos() -> [AvisoPlan] {
-        juego.avisos()
+    /// Avisos de misiones y de frases de hoy y mañana.
+    /// El plan se lee en el hilo principal: el JSContext de `juego` no se comparte entre tareas.
+    func reprogramarAvisos() async {
+        let plan = juego.avisos() + juego.avisosFrases()
+        let sonido = vista?.frasesConfig.sonido ?? false
+        await Avisos.reprogramar(plan, sonidoFrases: sonido)
     }
 
     func hacer(_ nombre: String, _ args: [String] = []) {
@@ -116,20 +174,23 @@ struct Raiz: View {
     @State private var hojaNuevo = false
 
     var body: some View {
-        TabView {
+        TabView(selection: $modelo.pestana) {
             Hoy(modelo: modelo, hojaNuevo: $hojaNuevo)
                 .tabItem { Label("Hoy", systemImage: "house.fill") }
+                .tag(Pestana.hoy)
             Productos(modelo: modelo, hojaNuevo: $hojaNuevo)
                 .tabItem { Label("Productos", systemImage: "square.stack.fill") }
+                .tag(Pestana.productos)
             Mas(modelo: modelo)
                 .tabItem { Label("Más", systemImage: "ellipsis.circle.fill") }
+                .tag(Pestana.mas)
         }
         .tint(Tema.acento)
         .background(Tema.fondo)
         .onAppear { modelo.refrescar() }
         .task {
             await Avisos.pedirPermisoSiHaceFalta()
-            await Avisos.reprogramar(modelo.planAvisos())
+            await modelo.reprogramarAvisos()
         }
         .onChange(of: fase) { _, nueva in if nueva == .active { modelo.refrescar() } }
         // "Hecho" desde la notificación o el widget con la app abierta.
