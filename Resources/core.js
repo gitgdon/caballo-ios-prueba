@@ -71,6 +71,9 @@ function newState() {
     movimientos: [],
     ultimoTotal: 0,
     favoritas: [],
+    productosBorrados: 0,
+    misTecnicas: [],
+    misTecnicasN: 0,
     frasesConfig: { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false },
   };
 }
@@ -94,6 +97,9 @@ function normalizeState(s) {
   if (!Array.isArray(s.favoritas)) s.favoritas = d.favoritas;
   s.frasesConfig = Object.assign(d.frasesConfig, s.frasesConfig);
   if (!Array.isArray(s.movimientos)) s.movimientos = d.movimientos;
+  if (!Number.isInteger(s.productosBorrados) || s.productosBorrados < 0) s.productosBorrados = d.productosBorrados;
+  if (!Array.isArray(s.misTecnicas)) s.misTecnicas = d.misTecnicas;
+  if (!Number.isInteger(s.misTecnicasN) || s.misTecnicasN < 0) s.misTecnicasN = d.misTecnicasN;
   // Último total de la tienda apuntado (nunca se reinicia). Un estado anterior lo toma del reto.
   if (s.ultimoTotal === undefined) s.ultimoTotal = (s.reto && enteroValido(s.reto.facturado)) || 0;
   s.ultimoTotal = enteroValido(s.ultimoTotal) || 0;
@@ -322,6 +328,57 @@ function ganarSecreta(s, id) {
   if (!s.secretas.includes(id)) s.secretas.push(id);
 }
 
+function borrarProducto(state, id, now) {
+  const s = clone(state);
+  const i = s.products.findIndex((p) => p.id === id);
+  if (i < 0) return s;
+  const p = s.products[i];
+  s.products.splice(i, 1);
+  s.productosBorrados = (s.productosBorrados || 0) + 1;
+  if (s.reto) s.reto.base -= Math.min(p.videos, s.reto.base);
+  if (s.today && Array.isArray(s.today.done)) s.today.done = s.today.done.filter((d) => String(d).indexOf(id + ':') !== 0);
+  return s;
+}
+
+function renombrarProducto(state, id, nombre) {
+  const s = clone(state);
+  const p = s.products.find((q) => q.id === id);
+  const t = String(nombre == null ? '' : nombre).trim();
+  if (p && t) p.name = t;
+  return s;
+}
+
+const MI_TECNICA_MAX = 140;
+
+function textoMiTecnica(texto) {
+  return Array.from(String(texto == null ? '' : texto).trim()).slice(0, MI_TECNICA_MAX).join('').trim();
+}
+
+function anadirMiTecnica(state, texto, productoId, now) {
+  const s = clone(state);
+  const t = textoMiTecnica(texto);
+  if (!t) return s;
+  const prod = productoId == null ? null : productoId;
+  if (prod !== null && !s.products.some((p) => p.id === prod)) return s;
+  s.misTecnicasN = (s.misTecnicasN || 0) + 1;
+  s.misTecnicas.push({ id: 'mt' + s.misTecnicasN, texto: t, producto: prod, dia: dayKey(now) });
+  return s;
+}
+
+function editarMiTecnica(state, id, texto) {
+  const s = clone(state);
+  const m = s.misTecnicas.find((x) => x.id === id);
+  const t = textoMiTecnica(texto);
+  if (m && t) m.texto = t;
+  return s;
+}
+
+function borrarMiTecnica(state, id) {
+  const s = clone(state);
+  s.misTecnicas = s.misTecnicas.filter((x) => x.id !== id);
+  return s;
+}
+
 function findProduct(s, id) {
   return s.products.find((p) => p.id === id);
 }
@@ -535,7 +592,7 @@ function achievements(before, after) {
 }
 
 function checkpointText(state) {
-  const n = state.productsStarted + 1;
+  const n = state.productsStarted - (state.productosBorrados || 0) + 1;
   return '🏁 Checkpoint guardado. Producto ' + n + (n > 30 ? '' : '/30') + ' desbloqueado';
 }
 
@@ -569,7 +626,7 @@ function retoInfo(state, now) {
     progreso: Math.min(1, r.facturado / r.meta),
     diasQuedan: Math.max(0, daysBetween(hoy, r.fin)),
     vencido: hoy > r.fin,
-    videos: totalVideos(state) - r.base,
+    videos: Math.max(0, totalVideos(state) - r.base),
     cumplido: r.cumplido,
   };
 }
@@ -610,6 +667,20 @@ function anadirGasto(state, importe, concepto, now) {
   const texto = Array.from(String(concepto == null ? '' : concepto).trim()).slice(0, GASTO_CONCEPTO_MAX).join('').trim();
   if (!Array.isArray(s.movimientos)) s.movimientos = [];
   s.movimientos.push({ dia: dayKey(now), tipo: 'gasto', importe: v, concepto: texto || 'Gasto' });
+  return s;
+}
+
+// Cambia importe y concepto de un gasto (misma validación que anadirGasto). Los ingresos no se editan.
+function editarGasto(state, indice, importe, concepto) {
+  const s = clone(state);
+  const m = Array.isArray(s.movimientos) && Number.isInteger(indice) ? s.movimientos[indice] : null;
+  if (!m || m.tipo !== 'gasto') return s;
+  if (typeof importe !== 'number' || !Number.isFinite(importe)) return s;
+  const v = centimos(importe);
+  if (v <= 0 || v > Number.MAX_SAFE_INTEGER) return s;
+  const texto = Array.from(String(concepto == null ? '' : concepto).trim()).slice(0, GASTO_CONCEPTO_MAX).join('').trim();
+  m.importe = v;
+  m.concepto = texto || 'Gasto';
   return s;
 }
 
@@ -712,6 +783,21 @@ function guardarGancho(state, productId, texto, n, now) {
   const t = Array.from(String(texto == null ? '' : texto).trim()).slice(0, 80).join('');
   if (!t) return s;
   s.ganchos.push({ texto: t, producto: productId, visitas: v, dia: dayKey(now) });
+  return s;
+}
+
+function editarGancho(state, indice, texto) {
+  const s = clone(state);
+  const g = Number.isInteger(indice) ? s.ganchos[indice] : null;
+  if (!g) return s;
+  const t = Array.from(String(texto == null ? '' : texto).trim()).slice(0, 80).join('');
+  if (t) g.texto = t;
+  return s;
+}
+
+function borrarGancho(state, indice) {
+  const s = clone(state);
+  if (Number.isInteger(indice) && indice >= 0 && indice < s.ganchos.length) s.ganchos.splice(indice, 1);
   return s;
 }
 
@@ -1043,5 +1129,7 @@ if (typeof module !== 'undefined') {
     FRASE_CATEGORIAS, PALABRAS_DINERO, frasesParaEmpujar, alternarFavorita, configurarFrases, planFrases,
     frasesDeHoyEnviadas, recortarFrases,
     anadirGasto, borrarMovimiento, calendarioMes,
+    borrarProducto, renombrarProducto, editarGasto, editarGancho, borrarGancho,
+    anadirMiTecnica, editarMiTecnica, borrarMiTecnica,
   };
 }
