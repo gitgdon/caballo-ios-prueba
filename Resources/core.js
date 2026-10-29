@@ -70,6 +70,8 @@ function newState() {
     avisos: { activos: true, hora: '18:00' },
     movimientos: [],
     ultimoTotal: 0,
+    favoritas: [],
+    frasesConfig: { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false },
   };
 }
 
@@ -89,6 +91,8 @@ function normalizeState(s) {
   s.avisos = Object.assign(d.avisos, s.avisos);
   s.avisos.hora = horaValida(s.avisos.hora);
   s.today = Object.assign(d.today, s.today);
+  if (!Array.isArray(s.favoritas)) s.favoritas = d.favoritas;
+  s.frasesConfig = Object.assign(d.frasesConfig, s.frasesConfig);
   if (!Array.isArray(s.movimientos)) s.movimientos = d.movimientos;
   // Último total de la tienda apuntado (nunca se reinicia). Un estado anterior lo toma del reto.
   if (s.ultimoTotal === undefined) s.ultimoTotal = (s.reto && enteroValido(s.reto.facturado)) || 0;
@@ -851,6 +855,141 @@ function planAvisos(state, now, quotes, extra) {
     .concat(avisosDelDia(sManana, manana, mananaNow, now, quotes, extra, false));
 }
 
+const FRASE_CATEGORIAS = ['accion', 'disciplina', 'imperfecto', 'verguenza'];
+const PALABRAS_DINERO = ['€', 'euro', 'dinero', 'millon', 'millonario', 'rico', 'factur', 'ganar', 'sueldo'];
+const FRASES_CONFIG = { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false };
+const FRASE_HUECO = 45;
+const AVISOS_TOPE_TOTAL = 60;
+
+function sinTildes(texto) {
+  return texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
+function esDeDinero(q) {
+  const t = sinTildes(q.texto || '');
+  return PALABRAS_DINERO.some((p) => t.includes(p));
+}
+
+function frasesParaEmpujar(quotes, state) {
+  const qs = quotes || [];
+  const favs = state.favoritas || [];
+  if (state.frasesConfig && state.frasesConfig.soloFavoritas) {
+    const elegidas = qs.filter((q) => favs.includes(q.id));
+    if (elegidas.length >= 3) return elegidas;
+  }
+  return qs.filter((q) => FRASE_CATEGORIAS.includes(q.categoria) && !esDeDinero(q));
+}
+
+function alternarFavorita(state, id) {
+  const s = clone(state);
+  const favs = s.favoritas || [];
+  s.favoritas = favs.includes(id) ? favs.filter((f) => f !== id) : favs.concat([id]);
+  return s;
+}
+
+const cadaHorasValida = (n) => Number.isInteger(n) && n >= 1 && n <= 6;
+
+function configurarFrases(state, cambios) {
+  const s = clone(state);
+  const c = Object.assign({}, FRASES_CONFIG, s.frasesConfig);
+  const k = cambios || {};
+  for (const b of ['activos', 'soloFavoritas', 'sonido']) if (typeof k[b] === 'boolean') c[b] = k[b];
+  if (cadaHorasValida(k.cadaHoras)) c.cadaHoras = k.cadaHoras;
+  const desde = typeof k.desde === 'string' && HORA_RE.test(k.desde) ? k.desde : c.desde;
+  const hasta = typeof k.hasta === 'string' && HORA_RE.test(k.hasta) ? k.hasta : c.hasta;
+  if (desde < hasta) Object.assign(c, { desde, hasta });
+  s.frasesConfig = c;
+  return s;
+}
+
+// Configuración que se usa para programar: lo que no es válido vuelve al valor por defecto.
+function frasesConfigValida(state) {
+  const c = Object.assign({}, FRASES_CONFIG, state.frasesConfig);
+  if (!cadaHorasValida(c.cadaHoras)) c.cadaHoras = FRASES_CONFIG.cadaHoras;
+  if (!HORA_RE.test(String(c.desde)) || !HORA_RE.test(String(c.hasta)) || c.desde >= c.hasta) {
+    c.desde = FRASES_CONFIG.desde;
+    c.hasta = FRASES_CONFIG.hasta;
+  }
+  return c;
+}
+
+const aMinutos = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
+
+// Todas las frases del día (sin mirar la hora actual): hora, frase y fecha.
+function frasesDelDia(s, c, day, quotes, fraseDelDiaId, avisosDia) {
+  const minsMision = avisosDia.map((a) => aMinutos(a.fecha.slice(11)));
+  const textosMision = avisosDia.map((a) => a.cuerpo.split('\n')[0]);
+  const pool = byId(frasesParaEmpujar(quotes, s));
+  let cands = pool.filter((q) => q.id !== fraseDelDiaId && !textosMision.includes(q.texto));
+  if (cands.length === 0) cands = pool;
+  const out = [];
+  if (cands.length === 0) return out;
+  const usadas = new Set();
+  const fin = aMinutos(c.hasta);
+  for (let min = aMinutos(c.desde), i = 0; min <= fin; min += c.cadaHoras * 60, i++) {
+    if (minsMision.some((m) => Math.abs(m - min) < FRASE_HUECO)) continue;
+    // Sin repetir en el día; si ya salieron todas, se vuelve a empezar.
+    if (usadas.size >= cands.length) usadas.clear();
+    // hashDay de textos que solo cambian en el índice da números seguidos: se mezcla para no sacar frases contiguas.
+    const h = hashDay(day + ':frase:' + i);
+    let k = (Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0) % cands.length;
+    while (usadas.has(cands[k].id)) k = (k + 1) % cands.length;
+    usadas.add(cands[k].id);
+    const hhmm = pad(Math.floor(min / 60)) + ':' + pad(min % 60);
+    out.push({ fecha: day + 'T' + hhmm, min, quote: cands[k] });
+  }
+  return out;
+}
+
+// Frases de hoy y de mañana, sin filtrar por la hora: todo sale del día, no de `now`.
+function frasesDeDosDias(state, now, quotes, extra) {
+  const s = normalizeState(clone(state));
+  const c = frasesConfigValida(s);
+  if (!c.activos) return [];
+  const hoyDia = dayKey(now);
+  const [y, m, d] = hoyDia.split('-').map(Number);
+  const inicio = new Date(y, m - 1, d, 0, 0);
+  const manana = addDays(hoyDia, 1);
+  const [my, mm, md] = manana.split('-').map(Number);
+  const mananaNow = new Date(my, mm - 1, md, 0, 1);
+  // Mismas frases del día que calcula planAvisos.
+  const sHoy = pickDailyQuote(rollDay(s, inicio), inicio, quotes, extra);
+  const sManana = pickDailyQuote(rollDay(sHoy, mananaNow), mananaNow, quotes, extra);
+  // Avisos de misión de todo el día (también los ya pasados), para que el plan no cambie con la hora.
+  const avisos = planAvisos(state, inicio, quotes, extra);
+  const deDia = (day) => avisos.filter((a) => a.fecha.startsWith(day));
+  const out = [];
+  for (const [day, sd] of [[hoyDia, sHoy], [manana, sManana]]) {
+    const [dy, dm, dd] = day.split('-').map(Number);
+    for (const f of frasesDelDia(s, c, day, quotes, sd.quote.id, deDia(day))) {
+      out.push(Object.assign(f, { day, hora: new Date(dy, dm - 1, dd, Math.floor(f.min / 60), f.min % 60).getTime() }));
+    }
+  }
+  return out;
+}
+
+function planFrases(state, now, quotes, extra) {
+  const futuras = frasesDeDosDias(state, now, quotes, extra).filter((f) => f.hora > now.getTime());
+  // Tope total con los avisos de misión: se quitan primero las más tardías (mañana, luego hoy).
+  const cabe = Math.max(0, AVISOS_TOPE_TOTAL - planAvisos(state, now, quotes, extra).length);
+  return futuras.slice(0, cabe).map((f) => ({
+    id: 'frase-' + f.fecha,
+    fecha: f.fecha,
+    titulo: AVISO_TITULO,
+    cuerpo: '"' + f.quote.texto + '" — ' + f.quote.autor,
+    fraseId: f.quote.id,
+    tipo: 'frase',
+  }));
+}
+
+function frasesDeHoyEnviadas(state, now, quotes, extra) {
+  const hoy = dayKey(now);
+  return frasesDeDosDias(state, now, quotes, extra)
+    .filter((f) => f.day === hoy && f.hora < now.getTime())
+    .reverse()
+    .map((f) => ({ fraseId: f.quote.id, fecha: f.fecha }));
+}
+
 if (typeof module !== 'undefined') {
   module.exports = {
     dayKey, addDays, daysBetween, blockOf, levelInfo, newState, parseState,
@@ -868,6 +1007,8 @@ if (typeof module !== 'undefined') {
     RETO_META, RETO_FIN, retoInfo, apuntarFacturacion, editarReto, nuevoReto, avisoCopia,
     FASES, faseDeVisitas, apuntarVisitas, pideGancho, guardarGancho, recomendacionDia14, resumenDescarte,
     AVISO_CATEGORIAS, configurarAvisos, planAvisos,
+    FRASE_CATEGORIAS, PALABRAS_DINERO, frasesParaEmpujar, alternarFavorita, configurarFrases, planFrases,
+    frasesDeHoyEnviadas,
     anadirGasto, borrarMovimiento, calendarioMes,
   };
 }
