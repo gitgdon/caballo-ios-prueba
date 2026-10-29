@@ -810,20 +810,25 @@ function horasAviso(hora) {
   return out;
 }
 
+// Horas de los avisos de misión del día (con la de la racha si toca) y la frase de cada una, sin mirar qué queda pendiente.
+function baseAvisosDia(s, day, quotes, racha, primerVideo) {
+  const slots = horasAviso(horaValida(s.avisos.hora));
+  if (racha > 0 && !slots.includes(AVISO_TOPE)) slots.push(AVISO_TOPE);
+  slots.sort((a, b) => a - b);
+  const cats = primerVideo ? ['imperfecto', 'accion'] : AVISO_CATEGORIAS;
+  const pool = byId((quotes || []).filter((q) => cats.includes(q.categoria) && q.id !== s.quote.id));
+  const start = hashDay(day + ':aviso');
+  return slots.map((min, i) => ({ min, quote: pool.length ? pool[(start + i) % pool.length] : null }));
+}
+
 function avisosDelDia(s, day, dayNow, now, quotes, extra, conRacha) {
   if (s.today.skipped || s.today.minimo) return [];
   const [y, mo, d] = day.split('-').map(Number);
-  const slots = horasAviso(horaValida(s.avisos.hora));
-  const primera = slots[0];
+  const primera = horasAviso(horaValida(s.avisos.hora))[0];
   const racha = conRacha && s.today.done.length === 0 ? streakNow(s, now) : 0;
-  if (racha > 0 && !slots.includes(AVISO_TOPE)) slots.push(AVISO_TOPE);
-  slots.sort((a, b) => a - b);
   const videos = pendingMissions(s, dayNow, extra).filter((m) => m.kind === 'video' || m.kind === 'ensayo');
-  const cats = primerVideoActivo(s, dayNow) ? ['imperfecto', 'accion'] : AVISO_CATEGORIAS;
-  const pool = byId((quotes || []).filter((q) => cats.includes(q.categoria) && q.id !== s.quote.id));
-  const start = hashDay(day + ':aviso');
   const out = [];
-  slots.forEach((min, i) => {
+  baseAvisosDia(s, day, quotes, racha, primerVideoActivo(s, dayNow)).forEach(({ min, quote }) => {
     if (new Date(y, mo - 1, d, Math.floor(min / 60), min % 60).getTime() <= now.getTime()) return;
     const hhmm = pad(Math.floor(min / 60)) + pad(min % 60);
     const base = { id: 'aviso-' + day + '-' + hhmm, fecha: day + 'T' + hhmm.slice(0, 2) + ':' + hhmm.slice(2), titulo: AVISO_TITULO };
@@ -837,7 +842,7 @@ function avisosDelDia(s, day, dayNow, now, quotes, extra, conRacha) {
     const grabar = min === primera;
     let l2 = grabar ? m.text : (n === 1 ? 'Te queda 1 vídeo hoy · ' : 'Te quedan ' + n + ' vídeos hoy · ') + m.text;
     if (findProduct(s, m.productId).place === 'calle') l2 = AVISO_CALLE + l2;
-    const l1 = pool.length ? pool[(start + i) % pool.length].texto + '\n' : '';
+    const l1 = quote ? quote.texto + '\n' : '';
     out.push(Object.assign(base, { cuerpo: l1 + l2, misionId: m.id, tipo: grabar ? 'grabar' : 'repetir' }));
   });
   return out;
@@ -857,27 +862,39 @@ function planAvisos(state, now, quotes, extra) {
 
 const FRASE_CATEGORIAS = ['accion', 'disciplina', 'imperfecto', 'verguenza'];
 const PALABRAS_DINERO = ['€', 'euro', 'dinero', 'millon', 'millonario', 'rico', 'factur', 'ganar', 'sueldo'];
+const PALABRAS_DINERO_EXTRA = ['$', 'gana', 'ganancia', 'pasta'];
+// '€' y '$' van dentro de cualquier texto; estas, como palabra entera ("ganas" o "histórico" no cuentan; "euros" sí);
+// el resto, al principio de una palabra ("facturar", "millones").
+const DINERO_SIMBOLOS = ['€', '$'];
+const DINERO_ENTERAS = { rico: 'rico', gana: 'gana', pasta: 'pasta', euro: 'euros?' };
 const FRASES_CONFIG = { activos: true, cadaHoras: 3, desde: '10:00', hasta: '22:00', soloFavoritas: false, sonido: false };
 const FRASE_HUECO = 45;
 const AVISOS_TOPE_TOTAL = 60;
 
 function sinTildes(texto) {
-  return texto.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  return texto.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
+
+const RE_DINERO = PALABRAS_DINERO.concat(PALABRAS_DINERO_EXTRA)
+  .filter((p) => !DINERO_SIMBOLOS.includes(p))
+  .map((p) => new RegExp('\\b' + (DINERO_ENTERAS[p] ? DINERO_ENTERAS[p] + '\\b' : p)));
 
 function esDeDinero(q) {
   const t = sinTildes(q.texto || '');
-  return PALABRAS_DINERO.some((p) => t.includes(p));
+  return DINERO_SIMBOLOS.some((p) => t.includes(p)) || RE_DINERO.some((re) => re.test(t));
+}
+
+function frasesDeCategorias(quotes) {
+  return (quotes || []).filter((q) => FRASE_CATEGORIAS.includes(q.categoria) && !esDeDinero(q));
 }
 
 function frasesParaEmpujar(quotes, state) {
-  const qs = quotes || [];
   const favs = state.favoritas || [];
   if (state.frasesConfig && state.frasesConfig.soloFavoritas) {
-    const elegidas = qs.filter((q) => favs.includes(q.id));
+    const elegidas = (quotes || []).filter((q) => favs.includes(q.id));
     if (elegidas.length >= 3) return elegidas;
   }
-  return qs.filter((q) => FRASE_CATEGORIAS.includes(q.categoria) && !esDeDinero(q));
+  return frasesDeCategorias(quotes);
 }
 
 function alternarFavorita(state, id) {
@@ -915,33 +932,44 @@ function frasesConfigValida(state) {
 
 const aMinutos = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
-// Todas las frases del día (sin mirar la hora actual): hora, frase y fecha.
-function frasesDelDia(s, c, day, quotes, fraseDelDiaId, avisosDia) {
-  const minsMision = avisosDia.map((a) => aMinutos(a.fecha.slice(11)));
-  const textosMision = avisosDia.map((a) => a.cuerpo.split('\n')[0]);
-  const pool = byId(frasesParaEmpujar(quotes, s));
-  let cands = pool.filter((q) => q.id !== fraseDelDiaId && !textosMision.includes(q.texto));
-  if (cands.length === 0) cands = pool;
-  const out = [];
-  if (cands.length === 0) return out;
+// Todas las frases del día (sin mirar la hora actual). `mision` son las horas de los avisos de misión y sus frases.
+function frasesDelDia(s, c, day, quotes, fraseDelDiaId, mision) {
+  const fuera = new Set([fraseDelDiaId].concat(mision.filter((b) => b.quote).map((b) => b.quote.id)));
+  const primero = byId(frasesParaEmpujar(quotes, s)).filter((q) => !fuera.has(q.id));
+  // Si las favoritas se acaban, el resto del día sale de las categorías, sin repetir.
+  const relleno = byId(frasesDeCategorias(quotes)).filter((q) => !fuera.has(q.id) && !primero.includes(q));
+  const grupos = [primero, relleno];
   const usadas = new Set();
+  const out = [];
   const fin = aMinutos(c.hasta);
   for (let min = aMinutos(c.desde), i = 0; min <= fin; min += c.cadaHoras * 60, i++) {
-    if (minsMision.some((m) => Math.abs(m - min) < FRASE_HUECO)) continue;
-    // Sin repetir en el día; si ya salieron todas, se vuelve a empezar.
-    if (usadas.size >= cands.length) usadas.clear();
+    if (mision.some((b) => Math.abs(b.min - min) < FRASE_HUECO)) continue;
+    const g = grupos.find((x) => x.some((q) => !usadas.has(q.id)));
+    if (!g) break;
     // hashDay de textos que solo cambian en el índice da números seguidos: se mezcla para no sacar frases contiguas.
     const h = hashDay(day + ':frase:' + i);
-    let k = (Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0) % cands.length;
-    while (usadas.has(cands[k].id)) k = (k + 1) % cands.length;
-    usadas.add(cands[k].id);
-    const hhmm = pad(Math.floor(min / 60)) + ':' + pad(min % 60);
-    out.push({ fecha: day + 'T' + hhmm, min, quote: cands[k] });
+    let k = (Math.imul(h ^ (h >>> 15), 0x2c1b3c6d) >>> 0) % g.length;
+    while (usadas.has(g[k].id)) k = (k + 1) % g.length;
+    usadas.add(g[k].id);
+    out.push({ fecha: day + 'T' + pad(Math.floor(min / 60)) + ':' + pad(min % 60), min, quote: g[k] });
   }
   return out;
 }
 
-// Frases de hoy y de mañana, sin filtrar por la hora: todo sale del día, no de `now`.
+// Racha al empezar el día: si hoy ya contó, la de antes es la anterior a esa suma.
+function habiaRacha(s, day, inicio) {
+  if (s.streak.countedDay === day) return s.streak.current > 1;
+  return streakNow(s, inicio) > 0;
+}
+
+// Modo primer vídeo al empezar el día: sin contar los vídeos de hoy.
+function primerVideoAlEmpezar(s, day) {
+  const deHoy = s.today.day === day ? s.today.videos : 0;
+  return totalVideos(s) - deHoy === 0 && s.products.some((p) => p.status === 'test' && testDay(p, day) >= 1);
+}
+
+// Frases de hoy y de mañana, sin filtrar por la hora. Todo sale del día y de la configuración,
+// no de `now` ni de lo que queda pendiente, así el plan no cambia al hacer, saltar o empezar lo mínimo.
 function frasesDeDosDias(state, now, quotes, extra) {
   const s = normalizeState(clone(state));
   const c = frasesConfigValida(s);
@@ -955,24 +983,29 @@ function frasesDeDosDias(state, now, quotes, extra) {
   // Mismas frases del día que calcula planAvisos.
   const sHoy = pickDailyQuote(rollDay(s, inicio), inicio, quotes, extra);
   const sManana = pickDailyQuote(rollDay(sHoy, mananaNow), mananaNow, quotes, extra);
-  // Avisos de misión de todo el día (también los ya pasados), para que el plan no cambie con la hora.
-  const avisos = planAvisos(state, inicio, quotes, extra);
-  const deDia = (day) => avisos.filter((a) => a.fecha.startsWith(day));
+  const avisosOn = s.avisos.activos !== false;
+  const dias = [
+    [hoyDia, sHoy, avisosOn ? baseAvisosDia(sHoy, hoyDia, quotes, habiaRacha(sHoy, hoyDia, inicio) ? 1 : 0, primerVideoAlEmpezar(sHoy, hoyDia)) : []],
+    [manana, sManana, avisosOn ? baseAvisosDia(sManana, manana, quotes, 0, primerVideoActivo(sManana, mananaNow)) : []],
+  ];
   const out = [];
-  for (const [day, sd] of [[hoyDia, sHoy], [manana, sManana]]) {
+  for (const [day, sd, mision] of dias) {
     const [dy, dm, dd] = day.split('-').map(Number);
-    for (const f of frasesDelDia(s, c, day, quotes, sd.quote.id, deDia(day))) {
+    for (const f of frasesDelDia(s, c, day, quotes, sd.quote.id, mision)) {
       out.push(Object.assign(f, { day, hora: new Date(dy, dm - 1, dd, Math.floor(f.min / 60), f.min % 60).getTime() }));
     }
   }
   return out;
 }
 
+// Tope total con los avisos de misión: se quitan primero las más tardías (mañana, luego hoy).
+function recortarFrases(frases, nAvisos) {
+  return frases.slice(0, Math.max(0, AVISOS_TOPE_TOTAL - nAvisos));
+}
+
 function planFrases(state, now, quotes, extra) {
   const futuras = frasesDeDosDias(state, now, quotes, extra).filter((f) => f.hora > now.getTime());
-  // Tope total con los avisos de misión: se quitan primero las más tardías (mañana, luego hoy).
-  const cabe = Math.max(0, AVISOS_TOPE_TOTAL - planAvisos(state, now, quotes, extra).length);
-  return futuras.slice(0, cabe).map((f) => ({
+  return recortarFrases(futuras, planAvisos(state, now, quotes, extra).length).map((f) => ({
     id: 'frase-' + f.fecha,
     fecha: f.fecha,
     titulo: AVISO_TITULO,
@@ -1008,7 +1041,7 @@ if (typeof module !== 'undefined') {
     FASES, faseDeVisitas, apuntarVisitas, pideGancho, guardarGancho, recomendacionDia14, resumenDescarte,
     AVISO_CATEGORIAS, configurarAvisos, planAvisos,
     FRASE_CATEGORIAS, PALABRAS_DINERO, frasesParaEmpujar, alternarFavorita, configurarFrases, planFrases,
-    frasesDeHoyEnviadas,
+    frasesDeHoyEnviadas, recortarFrases,
     anadirGasto, borrarMovimiento, calendarioMes,
   };
 }

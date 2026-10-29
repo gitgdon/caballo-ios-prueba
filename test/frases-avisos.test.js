@@ -3,8 +3,9 @@ const test = require('node:test');
 const assert = require('node:assert');
 const {
   newState, createProduct, rollDay, normalizeState, parseState, pickDailyQuote, planAvisos, configurarAvisos,
+  pendingMissions, completeMission, skipToday, startMinimo,
   FRASE_CATEGORIAS, PALABRAS_DINERO, frasesParaEmpujar, alternarFavorita, configurarFrases, planFrases,
-  frasesDeHoyEnviadas,
+  frasesDeHoyEnviadas, recortarFrases,
 } = require('../Resources/core.js');
 const { FRASES } = require('../Resources/frases.js');
 const { TECNICAS } = require('../Resources/tecnicas.js');
@@ -156,7 +157,8 @@ test('planFrases: solo horas posteriores a now, y estable al recalcular durante 
 });
 
 test('hasta es inclusiva y cadaHoras marca el paso', () => {
-  const s = configurarFrases(vacio(), { cadaHoras: 4, desde: '09:30', hasta: '21:30' });
+  // Sin avisos de misión: si no, las 17:30 y las 21:30 caen cerca de los avisos de 18:00 y 21:00.
+  const s = configurarFrases(configurarAvisos(vacio(), false, '18:00'), { cadaHoras: 4, desde: '09:30', hasta: '21:30' });
   assert.deepStrictEqual(horas(planFrases(s, at(HOY, 0), FRASES, EXTRA), HOY), ['09:30', '13:30', '17:30', '21:30']);
 });
 
@@ -243,4 +245,86 @@ test('frasesDeHoyEnviadas a las 17:00: las de 16:00, 13:00 y 10:00', () => {
     assert.strictEqual(e.fraseId, plan.find((f) => f.fecha === e.fecha).fraseId);
   }
   assert.deepStrictEqual(frasesDeHoyEnviadas(s, at(HOY, 9), FRASES, EXTRA), []);
+});
+
+test('dinero: también $, gana, ganancia y pasta; "ganas", "histórico" y "neurona" no cuentan', () => {
+  const pool = frasesParaEmpujar(FRASES, newState()).map((q) => q.id);
+  assert.ok(pool.length > 100, String(pool.length));
+  assert.ok(!pool.includes('f399'));
+  assert.ok(!pool.includes('f117'));
+  assert.ok(!pool.includes('f061'));
+  assert.ok(pool.includes('f327'));
+  assert.ok(sinTildes(FRASES.find((q) => q.id === 'f327').texto).includes('ganas'));
+  const qs = [
+    { id: 'a', categoria: 'accion', texto: '¿Sin ganas? Graba igual', detalle: '' },
+    { id: 'b', categoria: 'accion', texto: 'Un día histórico', detalle: '' },
+    { id: 'c', categoria: 'accion', texto: 'Cada neurona cuenta', detalle: '' },
+    { id: 'd', categoria: 'accion', texto: 'Uno gana y otro no', detalle: '' },
+    { id: 'e', categoria: 'accion', texto: 'Hacer pasta rápido', detalle: '' },
+    { id: 'f', categoria: 'accion', texto: 'Las GANANCIAS llegan', detalle: '' },
+    { id: 'g', categoria: 'accion', texto: 'Cobra 40 $', detalle: '' },
+    { id: 'h', categoria: 'accion', texto: 'Ser rico', detalle: '' },
+    { id: 'i', categoria: 'accion', texto: 'Mil euros', detalle: '' },
+    { id: 'j', categoria: 'accion', texto: 'Ganarás', detalle: '' },
+  ];
+  assert.deepStrictEqual(frasesParaEmpujar(qs, newState()).map((q) => q.id), ['a', 'b', 'c']);
+});
+
+test('el plan no cambia al hacer una misión, saltar el día o empezar lo mínimo', () => {
+  const now = at(HOY, 12);
+  for (const racha of [0, 5]) {
+    let s = conMision('18:00', at(HOY, 8));
+    if (racha) Object.assign(s.streak, { current: racha, best: racha, lastDay: '2026-10-26', countedDay: '2026-10-26', startDay: '2026-10-22' });
+    // La app elige la frase del día al abrir.
+    s = pickDailyQuote(s, at(HOY, 8), FRASES, EXTRA);
+    const plan = planFrases(s, now, FRASES, EXTRA);
+    const enviadas = frasesDeHoyEnviadas(s, now, FRASES, EXTRA);
+    assert.strictEqual(enviadas.length, 1);
+    // Con racha, el aviso de racha de las 22:00 aparta la frase de las 22:00.
+    assert.deepStrictEqual(horas(plan, HOY), racha ? ['13:00', '16:00', '19:00'] : ['13:00', '16:00', '19:00', '22:00']);
+    const video = pendingMissions(s, now, EXTRA).find((m) => m.kind === 'video').id;
+    const despues = [
+      completeMission(s, video, now, EXTRA),
+      skipToday(s, now),
+      startMinimo(s, now, EXTRA),
+    ];
+    assert.ok(despues[2].today.minimo);
+    for (const d of despues) {
+      assert.notDeepStrictEqual(planAvisos(d, now, FRASES, EXTRA), planAvisos(s, now, FRASES, EXTRA));
+      assert.deepStrictEqual(planFrases(d, now, FRASES, EXTRA), plan, 'racha ' + racha);
+      assert.deepStrictEqual(frasesDeHoyEnviadas(d, now, FRASES, EXTRA), enviadas);
+    }
+  }
+});
+
+test('con 3 favoritas y 5 horas, las otras 2 salen de las categorías sin repetir', () => {
+  const s0 = configurarAvisos(vacio(), false, '18:00');
+  const delDia = pickDailyQuote(s0, at(HOY, 9), FRASES, EXTRA).quote.id;
+  const favs = ['f001', 'f002', 'f003', 'f004'].filter((id) => id !== delDia).slice(0, 3);
+  let s = configurarFrases(s0, { soloFavoritas: true });
+  for (const id of favs) s = alternarFavorita(s, id);
+  const plan = planFrases(s, at(HOY, 9), FRASES, EXTRA);
+  const empujan = frasesParaEmpujar(FRASES, newState()).map((q) => q.id);
+  for (const day of [HOY, MANANA]) {
+    const ids = plan.filter((f) => f.fecha.startsWith(day)).map((f) => f.fraseId);
+    assert.strictEqual(ids.length, 5, day);
+    assert.strictEqual(new Set(ids).size, 5, day);
+    assert.deepStrictEqual(ids.filter((id) => favs.includes(id)).sort(), favs.slice().sort(), day);
+    for (const id of ids.filter((x) => !favs.includes(x))) assert.ok(empujan.includes(id), id);
+  }
+});
+
+test('sin frases candidatas ese día no sale ninguna', () => {
+  const unica = [{ id: 'x', categoria: 'accion', autor: 'A', texto: 'Graba hoy', detalle: '' }];
+  const s = vacio();
+  assert.deepStrictEqual(planFrases(s, at(HOY, 9), unica, EXTRA), []);
+  assert.deepStrictEqual(planFrases(s, at(HOY, 9), [], EXTRA), []);
+});
+
+test('recortarFrases deja las primeras hasta sumar 60 con los avisos de misión', () => {
+  const frases = Array.from({ length: 50 }, (_, i) => ({ n: i }));
+  assert.deepStrictEqual(recortarFrases(frases, 17), frases.slice(0, 43));
+  assert.deepStrictEqual(recortarFrases(frases, 10), frases);
+  assert.deepStrictEqual(recortarFrases(frases, 60), []);
+  assert.deepStrictEqual(recortarFrases(frases, 70), []);
 });
